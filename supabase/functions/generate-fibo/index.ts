@@ -53,23 +53,71 @@ serve(async (req) => {
       visual_output_content_moderation: true,
     };
 
-    // Handle mutually exclusive inputs - structured_prompt can be object or string
-    const hasStructuredPrompt = structured_prompt && 
-      (typeof structured_prompt === 'string' 
-        ? structured_prompt.trim().length > 0 
-        : Object.keys(structured_prompt).length > 0);
-
-    if (hasStructuredPrompt) {
-      // Use structured prompt for precise control - must be JSON string for Bria API
-      requestBody.structured_prompt = typeof structured_prompt === 'string' 
-        ? structured_prompt 
-        : JSON.stringify(structured_prompt);
-      
-      // If also have prompt, it acts as refinement
-      if (prompt && prompt.trim()) {
-        requestBody.prompt = prompt;
+    // Bria API expects either a text prompt OR a structured_prompt string from a previous generation
+    // For initial generation, we convert our structured prompt object to a descriptive text prompt
+    if (hasStructuredPromptValue) {
+      // If structured_prompt is an object, extract a text description for initial generation
+      if (typeof structured_prompt === 'object') {
+        // Build a rich text prompt from the structured prompt object
+        const sp = structured_prompt;
+        const parts: string[] = [];
+        
+        if (sp.short_description) {
+          parts.push(sp.short_description);
+        }
+        
+        if (sp.objects && Array.isArray(sp.objects)) {
+          sp.objects.forEach((obj: any) => {
+            if (obj.description) parts.push(obj.description);
+            if (obj.appearance_details) parts.push(obj.appearance_details);
+          });
+        }
+        
+        if (sp.background_setting) {
+          parts.push(`Background: ${sp.background_setting}`);
+        }
+        
+        if (sp.lighting) {
+          const lighting = sp.lighting;
+          if (lighting.conditions) parts.push(`Lighting: ${lighting.conditions}`);
+        }
+        
+        if (sp.aesthetics) {
+          const a = sp.aesthetics;
+          if (a.mood_atmosphere) parts.push(`Mood: ${a.mood_atmosphere}`);
+          if (a.color_scheme) parts.push(`Colors: ${a.color_scheme}`);
+        }
+        
+        if (sp.photographic_characteristics) {
+          const p = sp.photographic_characteristics;
+          if (p.camera_angle) parts.push(`Camera: ${p.camera_angle}`);
+          if (p.depth_of_field) parts.push(`DOF: ${p.depth_of_field}`);
+        }
+        
+        if (sp.style_medium) {
+          parts.push(`Style: ${sp.style_medium}`);
+        }
+        
+        if (sp.artistic_style) {
+          parts.push(sp.artistic_style);
+        }
+        
+        requestBody.prompt = parts.join('. ');
+        console.log('Generated text prompt from structured prompt:', requestBody.prompt);
+      } else {
+        // It's already a string - this would be from a previous Bria API response
+        requestBody.structured_prompt = structured_prompt;
       }
-    } else if (prompt && prompt.trim()) {
+      
+      // If also have an additional prompt, append it for refinement
+      if (hasPromptValue) {
+        if (requestBody.prompt) {
+          requestBody.prompt = `${requestBody.prompt}. ${prompt}`;
+        } else {
+          requestBody.prompt = prompt;
+        }
+      }
+    } else if (hasPromptValue) {
       // Text-only generation
       requestBody.prompt = prompt;
     } else {

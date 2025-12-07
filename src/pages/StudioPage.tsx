@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Camera, Sun, Focus, Gauge, Lock, Unlock, Loader2, Sparkles, ImagePlus } from "lucide-react";
+import { Camera, Sun, Focus, Gauge, Lock, Unlock, Loader2, Sparkles, ImagePlus, Palette, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Header from "@/components/Header";
@@ -13,13 +14,42 @@ import { useImageStore } from "@/hooks/useImageStore";
 import { useToast } from "@/hooks/use-toast";
 import { 
   CameraSettings, 
+  VisualSettings,
   DEFAULT_CAMERA_SETTINGS,
+  DEFAULT_VISUAL_SETTINGS,
   CAMERA_BODIES,
   LENS_TYPES,
   SHOT_PRESETS,
   LIGHTING_TYPES,
+  COLOR_GRADING_PRESETS,
+  MOOD_FILTERS,
 } from "@/types/database";
 import { FiboStructuredPrompt, ASPECT_RATIOS } from "@/types/fibo";
+
+// Color bit depth options
+const COLOR_BIT_DEPTHS = [
+  { value: '8', label: '8-bit (Standard)' },
+  { value: '10', label: '10-bit (HDR Ready)' },
+  { value: '12', label: '12-bit (Professional)' },
+  { value: '16', label: '16-bit (Cinema Grade)' },
+];
+
+// Color space options
+const COLOR_SPACES = [
+  { value: 'srgb', label: 'sRGB (Standard)' },
+  { value: 'adobe_rgb', label: 'Adobe RGB' },
+  { value: 'dci_p3', label: 'DCI-P3 (Wide Gamut)' },
+  { value: 'rec2020', label: 'Rec. 2020 (HDR)' },
+];
+
+// Tone mapping options
+const TONE_MAPPINGS = [
+  { value: 'none', label: 'None' },
+  { value: 'reinhard', label: 'Reinhard' },
+  { value: 'aces', label: 'ACES Filmic' },
+  { value: 'hdr10', label: 'HDR10' },
+  { value: 'dolby_vision', label: 'Dolby Vision' },
+];
 
 const DEFAULT_STUDIO_PROMPT: FiboStructuredPrompt = {
   short_description: "A photorealistic product photograph with cinematic lighting.",
@@ -64,10 +94,44 @@ const StudioPage = () => {
   const [customPrompt, setCustomPrompt] = useState("");
   const [aspectRatio, setAspectRatio] = useState("1:1");
   const [cameraSettings, setCameraSettings] = useState<CameraSettings>(DEFAULT_CAMERA_SETTINGS);
+  const [visualSettings, setVisualSettings] = useState<VisualSettings>(DEFAULT_VISUAL_SETTINGS);
   const [structuredPrompt, setStructuredPrompt] = useState<FiboStructuredPrompt>(DEFAULT_STUDIO_PROMPT);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [lockedParams, setLockedParams] = useState<string[]>([]);
+
+  // Update a visual setting
+  const updateVisualSetting = <K extends keyof VisualSettings>(key: K, value: VisualSettings[K]) => {
+    const newSettings = { ...visualSettings, [key]: value };
+    setVisualSettings(newSettings);
+    updatePromptFromVisuals(newSettings);
+  };
+
+  // Update prompt from visual settings
+  const updatePromptFromVisuals = (settings: VisualSettings) => {
+    const colorDescMap: Record<string, string> = {
+      'srgb': 'standard color range',
+      'adobe_rgb': 'wide color gamut (Adobe RGB)',
+      'dci_p3': 'cinema-grade DCI-P3 color space',
+      'rec2020': 'HDR Rec. 2020 color space',
+    };
+    const toneMapDesc: Record<string, string> = {
+      'none': '',
+      'reinhard': 'with Reinhard tone mapping',
+      'aces': 'with ACES filmic tone mapping',
+      'hdr10': 'with HDR10 processing',
+      'dolby_vision': 'with Dolby Vision grading',
+    };
+    
+    setStructuredPrompt(prev => ({
+      ...prev,
+      aesthetics: {
+        ...prev.aesthetics,
+        color_scheme: `${settings.color_palette}, ${settings.color_bit_depth}-bit color depth, ${colorDescMap[settings.color_space] || 'standard'}${settings.hdr_enabled ? ', HDR enabled' : ''}`,
+        mood_atmosphere: `${prev.aesthetics.mood_atmosphere}${toneMapDesc[settings.tone_mapping] ? `, ${toneMapDesc[settings.tone_mapping]}` : ''}`,
+      },
+    }));
+  };
 
   // Update a camera setting
   const updateSetting = <K extends keyof CameraSettings>(key: K, value: CameraSettings[K]) => {
@@ -204,7 +268,7 @@ const StudioPage = () => {
           undefined,
           undefined,
           cameraSettings,
-          undefined,
+          visualSettings,
           'studio',
           undefined
         );
@@ -295,11 +359,12 @@ const StudioPage = () => {
 
             {/* Camera Controls Tabs */}
             <Tabs defaultValue="camera" className="w-full">
-              <TabsList className="grid grid-cols-4 w-full">
+              <TabsList className="grid grid-cols-5 w-full">
                 <TabsTrigger value="camera"><Camera className="w-4 h-4" /></TabsTrigger>
                 <TabsTrigger value="lighting"><Sun className="w-4 h-4" /></TabsTrigger>
                 <TabsTrigger value="focus"><Focus className="w-4 h-4" /></TabsTrigger>
                 <TabsTrigger value="sensor"><Gauge className="w-4 h-4" /></TabsTrigger>
+                <TabsTrigger value="visual"><Palette className="w-4 h-4" /></TabsTrigger>
               </TabsList>
 
               {/* Camera Tab */}
@@ -542,6 +607,166 @@ const StudioPage = () => {
                   <Slider
                     value={[cameraSettings.dynamic_range]}
                     onValueChange={([v]) => updateSetting('dynamic_range', v)}
+                    min={0} max={100} step={1}
+                  />
+                </div>
+              </TabsContent>
+
+              {/* Visual Settings Tab */}
+              <TabsContent value="visual" className="glass-panel p-4 space-y-4 mt-4">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <Palette className="w-4 h-4 text-primary" />
+                  Visual & Color
+                </h3>
+
+                {/* HDR Toggle */}
+                <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Zap className="w-4 h-4 text-primary" />
+                    <Label className="text-sm font-medium">HDR Enabled</Label>
+                  </div>
+                  <Switch
+                    checked={visualSettings.hdr_enabled}
+                    onCheckedChange={(v) => updateVisualSetting('hdr_enabled', v)}
+                  />
+                </div>
+
+                {/* Color Bit Depth */}
+                <div className="space-y-2">
+                  <Label className="text-xs">Color Bit Depth</Label>
+                  <Select value={visualSettings.color_bit_depth} onValueChange={v => updateVisualSetting('color_bit_depth', v)}>
+                    <SelectTrigger className="bg-muted/50"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {COLOR_BIT_DEPTHS.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Color Space */}
+                <div className="space-y-2">
+                  <Label className="text-xs">Color Space</Label>
+                  <Select value={visualSettings.color_space} onValueChange={v => updateVisualSetting('color_space', v)}>
+                    <SelectTrigger className="bg-muted/50"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {COLOR_SPACES.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Tone Mapping */}
+                <div className="space-y-2">
+                  <Label className="text-xs">Tone Mapping</Label>
+                  <Select value={visualSettings.tone_mapping} onValueChange={v => updateVisualSetting('tone_mapping', v)}>
+                    <SelectTrigger className="bg-muted/50"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {TONE_MAPPINGS.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Color Grading Preset */}
+                <div className="space-y-2">
+                  <Label className="text-xs">Color Grading</Label>
+                  <Select value={visualSettings.color_grading_preset} onValueChange={v => updateVisualSetting('color_grading_preset', v)}>
+                    <SelectTrigger className="bg-muted/50"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {COLOR_GRADING_PRESETS.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Mood Filter */}
+                <div className="space-y-2">
+                  <Label className="text-xs">Mood Filter</Label>
+                  <Select value={visualSettings.mood_filter} onValueChange={v => updateVisualSetting('mood_filter', v)}>
+                    <SelectTrigger className="bg-muted/50"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {MOOD_FILTERS.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <h4 className="text-sm font-medium pt-2">Tone Adjustments</h4>
+
+                <div className="space-y-2">
+                  <Label className="text-xs">Brightness: {visualSettings.brightness}%</Label>
+                  <Slider
+                    value={[visualSettings.brightness]}
+                    onValueChange={([v]) => updateVisualSetting('brightness', v)}
+                    min={0} max={100} step={1}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs">Contrast: {visualSettings.contrast}%</Label>
+                  <Slider
+                    value={[visualSettings.contrast]}
+                    onValueChange={([v]) => updateVisualSetting('contrast', v)}
+                    min={0} max={100} step={1}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs">Saturation: {visualSettings.saturation}%</Label>
+                  <Slider
+                    value={[visualSettings.saturation]}
+                    onValueChange={([v]) => updateVisualSetting('saturation', v)}
+                    min={0} max={100} step={1}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs">Vibrance: {visualSettings.vibrance}%</Label>
+                  <Slider
+                    value={[visualSettings.vibrance]}
+                    onValueChange={([v]) => updateVisualSetting('vibrance', v)}
+                    min={0} max={100} step={1}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs">Clarity: {visualSettings.clarity}%</Label>
+                  <Slider
+                    value={[visualSettings.clarity]}
+                    onValueChange={([v]) => updateVisualSetting('clarity', v)}
+                    min={0} max={100} step={1}
+                  />
+                </div>
+
+                <h4 className="text-sm font-medium pt-2">Luminance Controls</h4>
+
+                <div className="space-y-2">
+                  <Label className="text-xs">Highlights: {visualSettings.highlights}%</Label>
+                  <Slider
+                    value={[visualSettings.highlights]}
+                    onValueChange={([v]) => updateVisualSetting('highlights', v)}
+                    min={0} max={100} step={1}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs">Shadows: {visualSettings.shadows}%</Label>
+                  <Slider
+                    value={[visualSettings.shadows]}
+                    onValueChange={([v]) => updateVisualSetting('shadows', v)}
+                    min={0} max={100} step={1}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs">Whites: {visualSettings.whites}%</Label>
+                  <Slider
+                    value={[visualSettings.whites]}
+                    onValueChange={([v]) => updateVisualSetting('whites', v)}
+                    min={0} max={100} step={1}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs">Blacks: {visualSettings.blacks}%</Label>
+                  <Slider
+                    value={[visualSettings.blacks]}
+                    onValueChange={([v]) => updateVisualSetting('blacks', v)}
                     min={0} max={100} step={1}
                   />
                 </div>

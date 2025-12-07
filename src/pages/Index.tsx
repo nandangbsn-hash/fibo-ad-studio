@@ -18,8 +18,45 @@ import {
 } from "@/types/fibo";
 
 const Index = () => {
+  // Initialize with a default structured prompt so users can generate immediately
+  const defaultPrompt: FiboStructuredPrompt = {
+    short_description: "A photorealistic product photograph of a premium item on a clean background.",
+    objects: [
+      {
+        description: "A premium product with sleek design",
+        location: "center",
+        relative_size: "large within frame",
+        shape_and_color: "Elegant design with premium materials",
+        texture: "smooth, premium finish",
+        appearance_details: "High-quality product photography style"
+      }
+    ],
+    background_setting: "clean, seamless white studio backdrop",
+    lighting: {
+      conditions: "bright, even studio lighting",
+      direction: "diffused from multiple sources",
+      shadows: "soft, subtle shadows adding depth"
+    },
+    aesthetics: {
+      composition: "centered composition",
+      color_scheme: "neutral, elegant",
+      mood_atmosphere: "professional, clean",
+      preference_score: "high",
+      aesthetic_score: "high"
+    },
+    photographic_characteristics: {
+      depth_of_field: "shallow",
+      focus: "sharp focus on subject",
+      camera_angle: "eye-level",
+      lens_focal_length: "portrait (85mm)"
+    },
+    style_medium: "photograph",
+    context: "Professional product photography for advertising.",
+    artistic_style: "photorealistic, commercial"
+  };
+
   const [appConfig, setAppConfig] = useState<AppConfig>(DEFAULT_APP_CONFIG);
-  const [structuredPrompt, setStructuredPrompt] = useState<FiboStructuredPrompt | null>(null);
+  const [structuredPrompt, setStructuredPrompt] = useState<FiboStructuredPrompt | null>(defaultPrompt);
   const [aspectRatio, setAspectRatio] = useState<string>("1:1");
   const [brandAnalysis, setBrandAnalysis] = useState<BrandAnalysis | null>(null);
   const [concepts, setConcepts] = useState<AdConcept[]>([]);

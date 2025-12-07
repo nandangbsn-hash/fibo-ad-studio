@@ -31,9 +31,14 @@ serve(async (req) => {
       sync = true 
     } = body;
     
+    const hasPromptValue = prompt && typeof prompt === 'string' && prompt.trim().length > 0;
+    const hasStructuredPromptValue = structured_prompt && 
+      (typeof structured_prompt === 'string' ? structured_prompt.trim().length > 0 : Object.keys(structured_prompt).length > 0);
+    
     console.log('Generate FIBO request:', { 
-      hasPrompt: !!prompt, 
-      hasStructuredPrompt: !!structured_prompt,
+      hasPrompt: hasPromptValue, 
+      hasStructuredPrompt: hasStructuredPromptValue,
+      structuredPromptType: typeof structured_prompt,
       aspect_ratio,
       sync
     });
@@ -48,18 +53,23 @@ serve(async (req) => {
       visual_output_content_moderation: true,
     };
 
-    // Handle mutually exclusive inputs
-    if (structured_prompt) {
-      // Use structured prompt for precise control
+    // Handle mutually exclusive inputs - structured_prompt can be object or string
+    const hasStructuredPrompt = structured_prompt && 
+      (typeof structured_prompt === 'string' 
+        ? structured_prompt.trim().length > 0 
+        : Object.keys(structured_prompt).length > 0);
+
+    if (hasStructuredPrompt) {
+      // Use structured prompt for precise control - must be JSON string for Bria API
       requestBody.structured_prompt = typeof structured_prompt === 'string' 
         ? structured_prompt 
         : JSON.stringify(structured_prompt);
       
       // If also have prompt, it acts as refinement
-      if (prompt) {
+      if (prompt && prompt.trim()) {
         requestBody.prompt = prompt;
       }
-    } else if (prompt) {
+    } else if (prompt && prompt.trim()) {
       // Text-only generation
       requestBody.prompt = prompt;
     } else {

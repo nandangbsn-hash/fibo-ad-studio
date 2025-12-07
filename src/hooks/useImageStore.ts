@@ -2,25 +2,28 @@ import { supabase } from "@/integrations/supabase/client";
 import { FiboStructuredPrompt } from "@/types/fibo";
 import { CameraSettings, VisualSettings, Campaign, DbAdConcept, GeneratedImageDb } from "@/types/database";
 import { useToast } from "@/hooks/use-toast";
+import { Json } from "@/integrations/supabase/types";
 
 export function useImageStore() {
   const { toast } = useToast();
 
   const saveCampaign = async (data: Partial<Campaign>): Promise<Campaign | null> => {
     try {
+      const insertData = {
+        brand_name: data.brand_name || 'Untitled Campaign',
+        product_description: data.product_description ?? null,
+        target_audience: data.target_audience ?? null,
+        mood: data.mood ?? null,
+        color_scheme: data.color_scheme ?? null,
+        category: data.category ?? null,
+        tone: data.tone ?? null,
+        key_values: data.key_values ?? null,
+        recommended_palette: data.recommended_palette ?? null,
+      };
+
       const { data: campaign, error } = await supabase
         .from('campaigns')
-        .insert({
-          brand_name: data.brand_name || 'Untitled Campaign',
-          product_description: data.product_description,
-          target_audience: data.target_audience,
-          mood: data.mood,
-          color_scheme: data.color_scheme,
-          category: data.category,
-          tone: data.tone,
-          key_values: data.key_values,
-          recommended_palette: data.recommended_palette,
-        })
+        .insert(insertData)
         .select()
         .single();
 
@@ -42,16 +45,18 @@ export function useImageStore() {
     aspectRatio: string
   ): Promise<DbAdConcept | null> => {
     try {
+      const insertData = {
+        campaign_id: campaignId,
+        name,
+        description,
+        structured_prompt: structuredPrompt as unknown as Json,
+        shot_list: shotList,
+        aspect_ratio: aspectRatio,
+      };
+
       const { data: concept, error } = await supabase
         .from('ad_concepts')
-        .insert({
-          campaign_id: campaignId,
-          name,
-          description,
-          structured_prompt: structuredPrompt as unknown as Record<string, unknown>,
-          shot_list: shotList,
-          aspect_ratio: aspectRatio,
-        })
+        .insert(insertData)
         .select()
         .single();
 
@@ -83,25 +88,27 @@ export function useImageStore() {
           .from('generated_images')
           .select('version')
           .eq('id', parentImageId)
-          .single();
+          .maybeSingle();
         if (parent) version = parent.version + 1;
       }
 
+      const insertData = {
+        image_url: imageUrl,
+        structured_prompt: structuredPrompt as unknown as Json,
+        aspect_ratio: aspectRatio,
+        seed: seed ?? null,
+        campaign_id: campaignId ?? null,
+        concept_id: conceptId ?? null,
+        camera_settings: (cameraSettings as unknown as Json) ?? null,
+        visual_settings: (visualSettings as unknown as Json) ?? null,
+        generation_type: generationType,
+        parent_image_id: parentImageId ?? null,
+        version,
+      };
+
       const { data: image, error } = await supabase
         .from('generated_images')
-        .insert({
-          image_url: imageUrl,
-          structured_prompt: structuredPrompt as unknown as Record<string, unknown>,
-          aspect_ratio: aspectRatio,
-          seed,
-          campaign_id: campaignId,
-          concept_id: conceptId,
-          camera_settings: cameraSettings as unknown as Record<string, unknown>,
-          visual_settings: visualSettings as unknown as Record<string, unknown>,
-          generation_type: generationType,
-          parent_image_id: parentImageId,
-          version,
-        })
+        .insert(insertData)
         .select()
         .single();
 
@@ -109,8 +116,8 @@ export function useImageStore() {
       return {
         ...image,
         structured_prompt: image.structured_prompt as unknown as FiboStructuredPrompt,
-        camera_settings: image.camera_settings as unknown as CameraSettings,
-        visual_settings: image.visual_settings as unknown as VisualSettings,
+        camera_settings: image.camera_settings as unknown as CameraSettings | null,
+        visual_settings: image.visual_settings as unknown as VisualSettings | null,
         generation_type: image.generation_type as GeneratedImageDb['generation_type'],
       } as GeneratedImageDb;
     } catch (error) {
@@ -130,8 +137,8 @@ export function useImageStore() {
       return (allImages || []).map(img => ({
         ...img,
         structured_prompt: img.structured_prompt as unknown as FiboStructuredPrompt,
-        camera_settings: img.camera_settings as unknown as CameraSettings,
-        visual_settings: img.visual_settings as unknown as VisualSettings,
+        camera_settings: img.camera_settings as unknown as CameraSettings | null,
+        visual_settings: img.visual_settings as unknown as VisualSettings | null,
         generation_type: img.generation_type as GeneratedImageDb['generation_type'],
       }));
     } catch (error) {

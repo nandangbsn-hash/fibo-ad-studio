@@ -101,6 +101,16 @@ export interface VisualSettings {
   export_height: number;
   color_grading_preset: string;
   mood_filter: string;
+  // Extended visual settings
+  color_bit_depth: string;
+  color_space: string;
+  tone_mapping: string;
+  highlights: number;
+  shadows: number;
+  whites: number;
+  blacks: number;
+  vibrance: number;
+  clarity: number;
 }
 
 export interface GeneratedImageDb {
@@ -178,6 +188,15 @@ export const DEFAULT_VISUAL_SETTINGS: VisualSettings = {
   export_height: 1024,
   color_grading_preset: 'none',
   mood_filter: 'none',
+  color_bit_depth: '8',
+  color_space: 'srgb',
+  tone_mapping: 'none',
+  highlights: 50,
+  shadows: 50,
+  whites: 50,
+  blacks: 50,
+  vibrance: 50,
+  clarity: 50,
 };
 
 // Camera presets

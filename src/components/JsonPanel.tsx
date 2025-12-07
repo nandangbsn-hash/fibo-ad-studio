@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { FiboConfig, DEFAULT_FIBO_CONFIG } from "@/types/fibo";
 import { useToast } from "@/hooks/use-toast";
 import Editor from "@monaco-editor/react";
+import { normalizeFiboConfig } from "@/utils/fiboHelpers";
 
 interface JsonPanelProps {
   config: FiboConfig;
@@ -17,10 +18,13 @@ const JsonPanel = ({ config, onChange }: JsonPanelProps) => {
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
 
+  // Ensure we always display valid config
+  const safeConfig = config?.input?.camera ? config : DEFAULT_FIBO_CONFIG;
+
   useEffect(() => {
-    setJsonString(JSON.stringify(config, null, 2));
+    setJsonString(JSON.stringify(safeConfig, null, 2));
     setError(null);
-  }, [config]);
+  }, [safeConfig]);
 
   const handleEditorChange = (value: string | undefined) => {
     if (!value) return;
@@ -28,7 +32,9 @@ const JsonPanel = ({ config, onChange }: JsonPanelProps) => {
     
     try {
       const parsed = JSON.parse(value);
-      onChange(parsed);
+      // Normalize the parsed config to ensure proper structure
+      const normalized = normalizeFiboConfig(parsed);
+      onChange(normalized);
       setError(null);
     } catch (e) {
       setError("Invalid JSON syntax");

@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { 
   FiboConfig, 
+  DEFAULT_FIBO_CONFIG,
   SHOT_PRESETS, 
   LIGHTING_TYPES, 
   COMPOSITION_TYPES, 
@@ -23,52 +24,56 @@ interface CameraDirectorProps {
 }
 
 const CameraDirector = ({ config, onChange }: CameraDirectorProps) => {
+  // Ensure we always have valid config with all required properties
+  const safeConfig = config?.input?.camera ? config : DEFAULT_FIBO_CONFIG;
+  const { camera, lighting, composition, style, ad_intent } = safeConfig.input;
+
   const updateCamera = (key: string, value: number | string) => {
     onChange({
-      ...config,
+      ...safeConfig,
       input: {
-        ...config.input,
-        camera: { ...config.input.camera, [key]: value }
+        ...safeConfig.input,
+        camera: { ...camera, [key]: value }
       }
     });
   };
 
   const updateLighting = (key: string, value: number | string) => {
     onChange({
-      ...config,
+      ...safeConfig,
       input: {
-        ...config.input,
-        lighting: { ...config.input.lighting, [key]: value }
+        ...safeConfig.input,
+        lighting: { ...lighting, [key]: value }
       }
     });
   };
 
   const updateComposition = (key: string, value: string) => {
     onChange({
-      ...config,
+      ...safeConfig,
       input: {
-        ...config.input,
-        composition: { ...config.input.composition, [key]: value }
+        ...safeConfig.input,
+        composition: { ...composition, [key]: value }
       }
     });
   };
 
   const updateStyle = (key: string, value: string | boolean) => {
     onChange({
-      ...config,
+      ...safeConfig,
       input: {
-        ...config.input,
-        style: { ...config.input.style, [key]: value }
+        ...safeConfig.input,
+        style: { ...style, [key]: value }
       }
     });
   };
 
   const updateAdIntent = (key: string, value: string) => {
     onChange({
-      ...config,
+      ...safeConfig,
       input: {
-        ...config.input,
-        ad_intent: { ...config.input.ad_intent, [key]: value }
+        ...safeConfig.input,
+        ad_intent: { ...ad_intent, [key]: value }
       }
     });
   };
@@ -102,10 +107,10 @@ const CameraDirector = ({ config, onChange }: CameraDirectorProps) => {
           <div className="space-y-2">
             <div className="flex justify-between">
               <Label className="text-xs text-muted-foreground">Camera Angle</Label>
-              <span className="text-xs text-primary font-mono">{config.input.camera.angle}°</span>
+              <span className="text-xs text-primary font-mono">{camera.angle}°</span>
             </div>
             <Slider
-              value={[config.input.camera.angle]}
+              value={[camera.angle]}
               onValueChange={([v]) => updateCamera('angle', v)}
               min={0}
               max={90}
@@ -116,10 +121,10 @@ const CameraDirector = ({ config, onChange }: CameraDirectorProps) => {
           <div className="space-y-2">
             <div className="flex justify-between">
               <Label className="text-xs text-muted-foreground">Field of View (FOV)</Label>
-              <span className="text-xs text-primary font-mono">{config.input.camera.fov}</span>
+              <span className="text-xs text-primary font-mono">{camera.fov}</span>
             </div>
             <Slider
-              value={[config.input.camera.fov]}
+              value={[camera.fov]}
               onValueChange={([v]) => updateCamera('fov', v)}
               min={10}
               max={120}
@@ -130,10 +135,10 @@ const CameraDirector = ({ config, onChange }: CameraDirectorProps) => {
           <div className="space-y-2">
             <div className="flex justify-between">
               <Label className="text-xs text-muted-foreground">Distance / Zoom</Label>
-              <span className="text-xs text-primary font-mono">{config.input.camera.distance.toFixed(1)}</span>
+              <span className="text-xs text-primary font-mono">{camera.distance.toFixed(1)}</span>
             </div>
             <Slider
-              value={[config.input.camera.distance * 10]}
+              value={[camera.distance * 10]}
               onValueChange={([v]) => updateCamera('distance', v / 10)}
               min={5}
               max={50}
@@ -147,10 +152,10 @@ const CameraDirector = ({ config, onChange }: CameraDirectorProps) => {
               {SHOT_PRESETS.map((preset) => (
                 <Button
                   key={preset.value}
-                  variant={config.input.camera.preset === preset.value ? "default" : "outline"}
+                  variant={camera.preset === preset.value ? "default" : "outline"}
                   size="sm"
                   onClick={() => updateCamera('preset', preset.value)}
-                  className={config.input.camera.preset === preset.value 
+                  className={camera.preset === preset.value 
                     ? "bg-gradient-gold text-primary-foreground" 
                     : "border-border/50 hover:border-primary/50"}
                 >
@@ -173,7 +178,7 @@ const CameraDirector = ({ config, onChange }: CameraDirectorProps) => {
           <div className="space-y-2">
             <Label className="text-xs text-muted-foreground">Lighting Type</Label>
             <Select 
-              value={config.input.lighting.type} 
+              value={lighting.type} 
               onValueChange={(v) => updateLighting('type', v)}
             >
               <SelectTrigger className="bg-muted/50 border-border/50">
@@ -192,10 +197,10 @@ const CameraDirector = ({ config, onChange }: CameraDirectorProps) => {
           <div className="space-y-2">
             <div className="flex justify-between">
               <Label className="text-xs text-muted-foreground">Intensity</Label>
-              <span className="text-xs text-primary font-mono">{(config.input.lighting.intensity * 100).toFixed(0)}%</span>
+              <span className="text-xs text-primary font-mono">{(lighting.intensity * 100).toFixed(0)}%</span>
             </div>
             <Slider
-              value={[config.input.lighting.intensity * 100]}
+              value={[lighting.intensity * 100]}
               onValueChange={([v]) => updateLighting('intensity', v / 100)}
               min={0}
               max={100}
@@ -206,10 +211,10 @@ const CameraDirector = ({ config, onChange }: CameraDirectorProps) => {
           <div className="space-y-2">
             <div className="flex justify-between">
               <Label className="text-xs text-muted-foreground">Color Temperature</Label>
-              <span className="text-xs text-primary font-mono">{config.input.lighting.color_temperature}K</span>
+              <span className="text-xs text-primary font-mono">{lighting.color_temperature}K</span>
             </div>
             <Slider
-              value={[config.input.lighting.color_temperature]}
+              value={[lighting.color_temperature]}
               onValueChange={([v]) => updateLighting('color_temperature', v)}
               min={2700}
               max={7500}
@@ -230,7 +235,7 @@ const CameraDirector = ({ config, onChange }: CameraDirectorProps) => {
           <div className="space-y-2">
             <Label className="text-xs text-muted-foreground">Framing</Label>
             <Select 
-              value={config.input.composition.framing} 
+              value={composition.framing} 
               onValueChange={(v) => updateComposition('framing', v)}
             >
               <SelectTrigger className="bg-muted/50 border-border/50">
@@ -249,7 +254,7 @@ const CameraDirector = ({ config, onChange }: CameraDirectorProps) => {
           <div className="space-y-2">
             <Label className="text-xs text-muted-foreground">Background</Label>
             <Select 
-              value={config.input.composition.background} 
+              value={composition.background} 
               onValueChange={(v) => updateComposition('background', v)}
             >
               <SelectTrigger className="bg-muted/50 border-border/50">
@@ -268,7 +273,7 @@ const CameraDirector = ({ config, onChange }: CameraDirectorProps) => {
           <div className="space-y-2">
             <Label className="text-xs text-muted-foreground">Depth of Field</Label>
             <Select 
-              value={config.input.composition.depth_of_field} 
+              value={composition.depth_of_field} 
               onValueChange={(v) => updateComposition('depth_of_field', v)}
             >
               <SelectTrigger className="bg-muted/50 border-border/50">
@@ -297,7 +302,7 @@ const CameraDirector = ({ config, onChange }: CameraDirectorProps) => {
           <div className="space-y-2">
             <Label className="text-xs text-muted-foreground">Contrast</Label>
             <Select 
-              value={config.input.style.contrast} 
+              value={style.contrast} 
               onValueChange={(v) => updateStyle('contrast', v)}
             >
               <SelectTrigger className="bg-muted/50 border-border/50">
@@ -316,7 +321,7 @@ const CameraDirector = ({ config, onChange }: CameraDirectorProps) => {
           <div className="space-y-2">
             <Label className="text-xs text-muted-foreground">Film Grain</Label>
             <Select 
-              value={config.input.style.grain} 
+              value={style.grain} 
               onValueChange={(v) => updateStyle('grain', v)}
             >
               <SelectTrigger className="bg-muted/50 border-border/50">
@@ -335,7 +340,7 @@ const CameraDirector = ({ config, onChange }: CameraDirectorProps) => {
           <div className="flex items-center justify-between">
             <Label className="text-xs text-muted-foreground">HDR Mode</Label>
             <Switch
-              checked={config.input.style.hdr}
+              checked={style.hdr}
               onCheckedChange={(v) => updateStyle('hdr', v)}
             />
           </div>
@@ -350,7 +355,7 @@ const CameraDirector = ({ config, onChange }: CameraDirectorProps) => {
         </div>
 
         <Select 
-          value={config.input.ad_intent.format} 
+          value={ad_intent.format} 
           onValueChange={(v) => updateAdIntent('format', v)}
         >
           <SelectTrigger className="bg-muted/50 border-border/50">

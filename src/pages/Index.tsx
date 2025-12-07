@@ -63,9 +63,12 @@ const Index = () => {
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  const handleAnalysisComplete = (analysis: BrandAnalysis, newConcepts: AdConcept[]) => {
+  const handleAnalysisComplete = (analysis: BrandAnalysis, newConcepts: AdConcept[], productDescription: string) => {
     setBrandAnalysis(analysis);
     setConcepts(newConcepts);
+    
+    // Update app config with subject description from brand intake
+    setAppConfig(prev => ({ ...prev, subject_description: productDescription }));
     
     // Auto-load first concept into editor
     if (newConcepts.length > 0) {
@@ -79,20 +82,19 @@ const Index = () => {
     setAspectRatio(ratio);
   };
 
-  // When app config changes, rebuild the structured prompt
+  // When app config changes, always rebuild the structured prompt
   const handleConfigChange = (newConfig: AppConfig) => {
     setAppConfig(newConfig);
     setAspectRatio(newConfig.aspect_ratio);
     
-    // Rebuild structured prompt based on new config
-    if (structuredPrompt) {
-      const updatedPrompt = buildStructuredPrompt(
-        newConfig, 
-        appConfig.subject_description || 'Premium product',
-        brandAnalysis?.category || 'Premium Brand'
-      );
-      setStructuredPrompt(updatedPrompt);
-    }
+    // Always rebuild structured prompt with the current subject description
+    const subject = newConfig.subject_description || 
+                    brandAnalysis?.category || 
+                    'Premium product';
+    const brand = brandAnalysis?.category || 'Premium Brand';
+    
+    const updatedPrompt = buildStructuredPrompt(newConfig, subject, brand);
+    setStructuredPrompt(updatedPrompt);
   };
 
   return (

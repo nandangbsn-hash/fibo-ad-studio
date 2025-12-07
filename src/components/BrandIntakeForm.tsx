@@ -5,10 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { BrandIntake, BrandAnalysis, AdConcept, DEFAULT_APP_CONFIG, FiboStructuredPrompt } from "@/types/fibo";
+import { BrandIntake, BrandAnalysis, AdConcept, FiboStructuredPrompt } from "@/types/fibo";
 
 interface BrandIntakeFormProps {
-  onAnalysisComplete: (analysis: BrandAnalysis, concepts: AdConcept[]) => void;
+  onAnalysisComplete: (analysis: BrandAnalysis, concepts: AdConcept[], productDescription: string) => void;
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
 }
@@ -47,7 +47,7 @@ const BrandIntakeForm = ({ onAnalysisComplete, isLoading, setIsLoading }: BrandI
           shot_list: c.shot_list || [],
           aspect_ratio: c.aspect_ratio || '1:1'
         }));
-        onAnalysisComplete(data.brand_analysis, normalizedConcepts);
+        onAnalysisComplete(data.brand_analysis, normalizedConcepts, formData.productDescription);
       } else {
         throw new Error(data.error || 'Analysis failed');
       }
@@ -107,7 +107,7 @@ const BrandIntakeForm = ({ onAnalysisComplete, isLoading, setIsLoading }: BrandI
           aspect_ratio: "1:1"
         }
       ];
-      onAnalysisComplete(demoAnalysis, demoConcepts);
+      onAnalysisComplete(demoAnalysis, demoConcepts, formData.productDescription);
     } finally {
       setIsLoading(false);
     }

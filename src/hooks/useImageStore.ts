@@ -78,7 +78,7 @@ export function useImageStore() {
     conceptId?: string,
     cameraSettings?: CameraSettings,
     visualSettings?: VisualSettings,
-    generationType: 'initial' | 'camera_edit' | 'visual_edit' = 'initial',
+    generationType: 'initial' | 'camera_edit' | 'visual_edit' | 'studio' = 'initial',
     parentImageId?: string
   ): Promise<GeneratedImageDb | null> => {
     try {

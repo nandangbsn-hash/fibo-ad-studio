@@ -8,6 +8,7 @@ const Header = () => {
 
   const navItems = [
     { path: "/", label: "Ad Director", icon: Sparkles },
+    { path: "/studio", label: "Studio", icon: Camera },
     { path: "/feed", label: "Feed", icon: Film },
   ];
 

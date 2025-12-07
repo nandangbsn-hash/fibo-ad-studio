@@ -115,7 +115,7 @@ export interface GeneratedImageDb {
   parent_image_id: string | null;
   camera_settings: CameraSettings | null;
   visual_settings: VisualSettings | null;
-  generation_type: 'initial' | 'camera_edit' | 'visual_edit';
+  generation_type: 'initial' | 'camera_edit' | 'visual_edit' | 'studio';
   created_at: string;
 }
 

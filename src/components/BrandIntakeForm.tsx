@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { BrandIntake, BrandAnalysis, AdConcept } from "@/types/fibo";
+import { BrandIntake, BrandAnalysis, AdConcept, DEFAULT_FIBO_CONFIG } from "@/types/fibo";
+import { normalizeFiboConfig, normalizeConcepts } from "@/utils/fiboHelpers";
 
 interface BrandIntakeFormProps {
   onAnalysisComplete: (analysis: BrandAnalysis, concepts: AdConcept[]) => void;
@@ -38,8 +39,10 @@ const BrandIntakeForm = ({ onAnalysisComplete, isLoading, setIsLoading }: BrandI
 
       const data = await response.json();
       
-      if (data.success) {
-        onAnalysisComplete(data.brand_analysis, data.concepts);
+      if (data.success && data.concepts) {
+        // Normalize the concepts to match our expected structure
+        const normalizedConcepts = normalizeConcepts(data.concepts);
+        onAnalysisComplete(data.brand_analysis, normalizedConcepts);
       } else {
         throw new Error(data.error || 'Analysis failed');
       }
@@ -52,21 +55,20 @@ const BrandIntakeForm = ({ onAnalysisComplete, isLoading, setIsLoading }: BrandI
         key_values: ["Quality", "Innovation", "Elegance"],
         recommended_palette: "brand_warm_luxury"
       };
+      
+      // Create properly structured demo concept
+      const demoConfig = { ...DEFAULT_FIBO_CONFIG };
+      demoConfig.input.subject.name = formData.brandName || "Premium Product";
+      demoConfig.input.subject.brand = formData.brandName || "BRAND";
+      demoConfig.input.subject.context = formData.productDescription || "premium lifestyle advertising";
+      demoConfig.input.ad_intent.mood = formData.mood || "sleek, luxurious";
+      demoConfig.input.ad_intent.target_audience = formData.targetAudience || "urban premium buyers";
+      
       const demoConcepts: AdConcept[] = [
         {
           name: "Hero Spotlight",
           description: "Dramatic product showcase with studio lighting",
-          fibo_config: {
-            model: "fibo-image-1",
-            input: {
-              camera: { angle: 35, fov: 28, distance: 1.2, shot: "close_up", preset: "hero_product" },
-              lighting: { type: "studio_soft", intensity: 0.85, position: "front_top", color_temperature: 5200 },
-              composition: { framing: "rule_of_thirds", background: "minimal_white", depth_of_field: "shallow" },
-              style: { color_palette: "brand_warm_luxury", contrast: "medium_high", hdr: true, grain: "none" },
-              subject: { type: "physical_product", name: formData.brandName || "Premium Product", brand: formData.brandName, position: "center", context: formData.productDescription || "premium lifestyle advertising" },
-              ad_intent: { mood: formData.mood || "sleek, luxurious", target_audience: formData.targetAudience || "urban premium buyers", format: "instagram_1x1", copy_direction: "minimal, clean aesthetic" }
-            }
-          },
+          fibo_config: demoConfig,
           shot_list: ["Hero wide shot", "Detail macro", "Lifestyle context", "Brand lockup"]
         }
       ];

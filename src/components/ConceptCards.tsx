@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { Lightbulb, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AdConcept, FiboConfig } from "@/types/fibo";
+import { normalizeFiboConfig } from "@/utils/fiboHelpers";
 
 interface ConceptCardsProps {
   concepts: AdConcept[];
@@ -10,6 +11,12 @@ interface ConceptCardsProps {
 
 const ConceptCards = ({ concepts, onSelectConcept }: ConceptCardsProps) => {
   if (concepts.length === 0) return null;
+
+  const handleSelectConcept = (rawConfig: any) => {
+    // Ensure the config is properly normalized before passing to parent
+    const normalized = normalizeFiboConfig(rawConfig);
+    onSelectConcept(normalized);
+  };
 
   return (
     <motion.section
@@ -35,7 +42,7 @@ const ConceptCards = ({ concepts, onSelectConcept }: ConceptCardsProps) => {
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: idx * 0.1 }}
             className="group relative p-4 bg-muted/30 rounded-xl border border-border/50 hover:border-primary/50 transition-all cursor-pointer"
-            onClick={() => onSelectConcept(concept.fibo_config)}
+            onClick={() => handleSelectConcept(concept.fibo_config)}
           >
             <div className="flex items-start justify-between gap-4">
               <div className="space-y-2 flex-1">

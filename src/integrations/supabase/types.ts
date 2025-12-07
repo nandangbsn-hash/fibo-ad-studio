@@ -14,7 +14,165 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      ad_concepts: {
+        Row: {
+          aspect_ratio: string | null
+          campaign_id: string | null
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          shot_list: string[] | null
+          structured_prompt: Json
+          updated_at: string
+        }
+        Insert: {
+          aspect_ratio?: string | null
+          campaign_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          shot_list?: string[] | null
+          structured_prompt: Json
+          updated_at?: string
+        }
+        Update: {
+          aspect_ratio?: string | null
+          campaign_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          shot_list?: string[] | null
+          structured_prompt?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ad_concepts_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaigns: {
+        Row: {
+          brand_name: string
+          category: string | null
+          color_scheme: string | null
+          created_at: string
+          id: string
+          key_values: string[] | null
+          mood: string | null
+          product_description: string | null
+          recommended_palette: string | null
+          target_audience: string | null
+          tone: string | null
+          updated_at: string
+        }
+        Insert: {
+          brand_name: string
+          category?: string | null
+          color_scheme?: string | null
+          created_at?: string
+          id?: string
+          key_values?: string[] | null
+          mood?: string | null
+          product_description?: string | null
+          recommended_palette?: string | null
+          target_audience?: string | null
+          tone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          brand_name?: string
+          category?: string | null
+          color_scheme?: string | null
+          created_at?: string
+          id?: string
+          key_values?: string[] | null
+          mood?: string | null
+          product_description?: string | null
+          recommended_palette?: string | null
+          target_audience?: string | null
+          tone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      generated_images: {
+        Row: {
+          aspect_ratio: string | null
+          camera_settings: Json | null
+          campaign_id: string | null
+          concept_id: string | null
+          created_at: string
+          generation_type: string | null
+          id: string
+          image_url: string
+          parent_image_id: string | null
+          seed: number | null
+          structured_prompt: Json
+          version: number
+          visual_settings: Json | null
+        }
+        Insert: {
+          aspect_ratio?: string | null
+          camera_settings?: Json | null
+          campaign_id?: string | null
+          concept_id?: string | null
+          created_at?: string
+          generation_type?: string | null
+          id?: string
+          image_url: string
+          parent_image_id?: string | null
+          seed?: number | null
+          structured_prompt: Json
+          version?: number
+          visual_settings?: Json | null
+        }
+        Update: {
+          aspect_ratio?: string | null
+          camera_settings?: Json | null
+          campaign_id?: string | null
+          concept_id?: string | null
+          created_at?: string
+          generation_type?: string | null
+          id?: string
+          image_url?: string
+          parent_image_id?: string | null
+          seed?: number | null
+          structured_prompt?: Json
+          version?: number
+          visual_settings?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generated_images_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generated_images_concept_id_fkey"
+            columns: ["concept_id"]
+            isOneToOne: false
+            referencedRelation: "ad_concepts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generated_images_parent_image_id_fkey"
+            columns: ["parent_image_id"]
+            isOneToOne: false
+            referencedRelation: "generated_images"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

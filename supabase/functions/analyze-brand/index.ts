@@ -23,20 +23,53 @@ serve(async (req) => {
     
     console.log('Analyzing brand:', brandName);
 
-    const systemPrompt = `You are an expert advertising creative director and brand strategist. 
-Your task is to analyze brand information and generate professional ad concepts with FIBO-compatible JSON configurations.
+    const systemPrompt = `You are an expert advertising creative director and brand strategist specializing in AI-powered image generation.
 
-FIBO is a JSON-native image generation model that uses structured cinematography parameters:
-- camera: angle (0-90), fov (10-120), distance (0.5-5), shot type, preset
-- lighting: type, intensity (0-1), position, color_temperature
-- composition: framing, background, depth_of_field
-- style: color_palette, contrast, hdr, grain
-- subject: type, name, brand, position, context
-- ad_intent: mood, target_audience, format, copy_direction
+Your task is to analyze brand information and generate professional ad concepts with BRIA FIBO-compatible structured prompts.
+
+FIBO uses a specific JSON schema for image generation. Each structured_prompt must follow this exact format:
+
+{
+  "short_description": "A detailed 2-3 sentence description of the entire scene",
+  "objects": [
+    {
+      "description": "Detailed description of the object",
+      "location": "center | top-left | bottom-right | etc.",
+      "relationship": "Relationship to other objects",
+      "relative_size": "small | medium | large within frame",
+      "shape_and_color": "Shape and color details",
+      "texture": "Surface texture description",
+      "appearance_details": "Additional visual details",
+      "orientation": "horizontal | vertical | etc."
+    }
+  ],
+  "background_setting": "Detailed background description",
+  "lighting": {
+    "conditions": "bright studio lighting | natural sunlight | golden hour | etc.",
+    "direction": "front-lit | side-lit | backlit | diffused from multiple sources",
+    "shadows": "Description of shadow qualities"
+  },
+  "aesthetics": {
+    "composition": "centered | rule of thirds | symmetrical | etc.",
+    "color_scheme": "Color palette description",
+    "mood_atmosphere": "elegant | energetic | serene | etc.",
+    "preference_score": "very high",
+    "aesthetic_score": "very high"
+  },
+  "photographic_characteristics": {
+    "depth_of_field": "shallow | medium | deep",
+    "focus": "sharp focus on subject | soft focus | etc.",
+    "camera_angle": "eye-level | high-angle | low-angle | etc.",
+    "lens_focal_length": "wide (24mm) | standard (50mm) | portrait (85mm) | macro"
+  },
+  "style_medium": "photograph | 3D render | digital illustration | etc.",
+  "context": "Context and intended use of the image",
+  "artistic_style": "photorealistic | minimalist | cinematic | etc."
+}
 
 Generate creative, professional advertising concepts that would work for high-end product photography.`;
 
-    const userPrompt = `Analyze this brand and generate 3 ad concepts with FIBO configurations:
+    const userPrompt = `Analyze this brand and generate 3 ad concepts with FIBO-compatible structured prompts:
 
 Brand Name: ${brandName}
 Target Audience: ${targetAudience}
@@ -45,9 +78,10 @@ Color Scheme: ${colorScheme || 'To be determined based on brand analysis'}
 Product Description: ${productDescription || 'Premium product'}
 
 For each concept, provide:
-1. Concept name and description
-2. A complete FIBO JSON configuration
-3. Shot list with 3-5 shot descriptions
+1. A creative concept name and description
+2. A complete FIBO structured_prompt following the exact schema above
+3. A shot list with 3-5 shot descriptions
+4. Recommended aspect_ratio (1:1, 4:5, 16:9, etc.)
 
 Return your response as valid JSON with this structure:
 {
@@ -61,8 +95,9 @@ Return your response as valid JSON with this structure:
     {
       "name": "string",
       "description": "string",
-      "fibo_config": { /* full FIBO JSON */ },
-      "shot_list": ["string"]
+      "structured_prompt": { /* full FIBO structured_prompt object */ },
+      "shot_list": ["string"],
+      "aspect_ratio": "1:1"
     }
   ]
 }`;
@@ -93,7 +128,7 @@ Return your response as valid JSON with this structure:
     const data = await response.json();
     const generatedContent = JSON.parse(data.choices[0].message.content);
     
-    console.log('Brand analysis complete');
+    console.log('Brand analysis complete, generated concepts:', generatedContent.concepts?.length);
 
     return new Response(JSON.stringify({
       success: true,

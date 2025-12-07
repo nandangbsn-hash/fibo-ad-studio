@@ -2,39 +2,35 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Code2, Copy, Check, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { FiboConfig, DEFAULT_FIBO_CONFIG } from "@/types/fibo";
+import { FiboStructuredPrompt } from "@/types/fibo";
 import { useToast } from "@/hooks/use-toast";
 import Editor from "@monaco-editor/react";
-import { normalizeFiboConfig } from "@/utils/fiboHelpers";
 
 interface JsonPanelProps {
-  config: FiboConfig;
-  onChange: (config: FiboConfig) => void;
+  structuredPrompt: FiboStructuredPrompt | null;
+  onChange: (structuredPrompt: FiboStructuredPrompt) => void;
 }
 
-const JsonPanel = ({ config, onChange }: JsonPanelProps) => {
+const JsonPanel = ({ structuredPrompt, onChange }: JsonPanelProps) => {
   const [jsonString, setJsonString] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
 
-  // Ensure we always display valid config
-  const safeConfig = config?.input?.camera ? config : DEFAULT_FIBO_CONFIG;
-
   useEffect(() => {
-    setJsonString(JSON.stringify(safeConfig, null, 2));
-    setError(null);
-  }, [safeConfig]);
+    if (structuredPrompt) {
+      setJsonString(JSON.stringify(structuredPrompt, null, 2));
+      setError(null);
+    }
+  }, [structuredPrompt]);
 
   const handleEditorChange = (value: string | undefined) => {
     if (!value) return;
     setJsonString(value);
     
     try {
-      const parsed = JSON.parse(value);
-      // Normalize the parsed config to ensure proper structure
-      const normalized = normalizeFiboConfig(parsed);
-      onChange(normalized);
+      const parsed = JSON.parse(value) as FiboStructuredPrompt;
+      onChange(parsed);
       setError(null);
     } catch (e) {
       setError("Invalid JSON syntax");
@@ -46,16 +42,19 @@ const JsonPanel = ({ config, onChange }: JsonPanelProps) => {
     setCopied(true);
     toast({
       title: "Copied!",
-      description: "FIBO JSON copied to clipboard",
+      description: "FIBO structured prompt copied to clipboard",
     });
     setTimeout(() => setCopied(false), 2000);
   };
 
   const handleReset = () => {
-    onChange(DEFAULT_FIBO_CONFIG);
+    if (structuredPrompt) {
+      setJsonString(JSON.stringify(structuredPrompt, null, 2));
+      setError(null);
+    }
     toast({
       title: "Reset",
-      description: "Configuration reset to defaults",
+      description: "JSON reset to current structured prompt",
     });
   };
 
@@ -72,8 +71,8 @@ const JsonPanel = ({ config, onChange }: JsonPanelProps) => {
             <Code2 className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold">FIBO JSON</h2>
-            <p className="text-sm text-muted-foreground">Live configuration</p>
+            <h2 className="text-lg font-semibold">FIBO Structured Prompt</h2>
+            <p className="text-sm text-muted-foreground">Live configuration for Bria API</p>
           </div>
         </div>
         
@@ -130,7 +129,7 @@ const JsonPanel = ({ config, onChange }: JsonPanelProps) => {
 
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-        <span>Changes sync automatically with Camera Director</span>
+        <span>Edit the JSON directly to customize your generation</span>
       </div>
     </motion.section>
   );

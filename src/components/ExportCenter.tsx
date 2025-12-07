@@ -1,31 +1,40 @@
 import { motion } from "framer-motion";
 import { Package, FileJson, Image, FileArchive, FileText, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { FiboConfig, GeneratedImage, BrandAnalysis, AdConcept } from "@/types/fibo";
+import { FiboStructuredPrompt, GeneratedImage, BrandAnalysis, AdConcept } from "@/types/fibo";
 import { useToast } from "@/hooks/use-toast";
 
 interface ExportCenterProps {
-  config: FiboConfig;
+  structuredPrompt: FiboStructuredPrompt | null;
   generatedImages: GeneratedImage[];
   brandAnalysis: BrandAnalysis | null;
   concepts: AdConcept[];
 }
 
-const ExportCenter = ({ config, generatedImages, brandAnalysis, concepts }: ExportCenterProps) => {
+const ExportCenter = ({ structuredPrompt, generatedImages, brandAnalysis, concepts }: ExportCenterProps) => {
   const { toast } = useToast();
 
   const exportJson = () => {
-    const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+    if (!structuredPrompt) {
+      toast({
+        title: "No Data",
+        description: "Generate a concept first",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const blob = new Blob([JSON.stringify(structuredPrompt, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `fibo-config-${Date.now()}.json`;
+    a.download = `fibo-structured-prompt-${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
     
     toast({
       title: "JSON Exported",
-      description: "FIBO configuration saved",
+      description: "FIBO structured prompt saved",
     });
   };
 
@@ -35,26 +44,24 @@ const ExportCenter = ({ config, generatedImages, brandAnalysis, concepts }: Expo
     ).join('\n');
     
     const content = `# FIBO Ad Director - Shot List
-# Brand: ${config.input.subject.brand}
 # Generated: ${new Date().toISOString()}
 
 ${shotList || 'No shot list available. Generate concepts first.'}
 
-## Camera Settings
-- Angle: ${config.input.camera.angle}°
-- FOV: ${config.input.camera.fov}
-- Distance: ${config.input.camera.distance}
-- Preset: ${config.input.camera.preset}
+## Structured Prompt Summary
+${structuredPrompt?.short_description || 'No description available'}
+
+## Style
+- Medium: ${structuredPrompt?.style_medium || 'N/A'}
+- Artistic Style: ${structuredPrompt?.artistic_style || 'N/A'}
 
 ## Lighting
-- Type: ${config.input.lighting.type}
-- Intensity: ${(config.input.lighting.intensity * 100).toFixed(0)}%
-- Color Temperature: ${config.input.lighting.color_temperature}K
+- Conditions: ${structuredPrompt?.lighting?.conditions || 'N/A'}
+- Direction: ${structuredPrompt?.lighting?.direction || 'N/A'}
 
 ## Composition
-- Framing: ${config.input.composition.framing}
-- Background: ${config.input.composition.background}
-- Depth of Field: ${config.input.composition.depth_of_field}
+- ${structuredPrompt?.aesthetics?.composition || 'N/A'}
+- Mood: ${structuredPrompt?.aesthetics?.mood_atmosphere || 'N/A'}
 `;
     
     const blob = new Blob([content], { type: 'text/plain' });
@@ -73,9 +80,8 @@ ${shotList || 'No shot list available. Generate concepts first.'}
 
   const exportBrandPack = () => {
     const pack = {
-      brand_name: config.input.subject.brand,
       analysis: brandAnalysis,
-      fibo_config: config,
+      structured_prompt: structuredPrompt,
       concepts: concepts,
       generated_at: new Date().toISOString(),
     };
@@ -84,7 +90,7 @@ ${shotList || 'No shot list available. Generate concepts first.'}
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `brand-pack-${config.input.subject.brand}-${Date.now()}.json`;
+    a.download = `brand-pack-${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
     
@@ -98,9 +104,9 @@ ${shotList || 'No shot list available. Generate concepts first.'}
     {
       icon: FileJson,
       title: "FIBO JSON",
-      description: "Export current configuration",
+      description: "Export structured prompt",
       action: exportJson,
-      available: true,
+      available: !!structuredPrompt,
     },
     {
       icon: Image,
@@ -115,7 +121,7 @@ ${shotList || 'No shot list available. Generate concepts first.'}
           });
           return;
         }
-        generatedImages.forEach((img, i) => {
+        generatedImages.forEach((img) => {
           window.open(img.url, '_blank');
         });
       },
@@ -126,14 +132,14 @@ ${shotList || 'No shot list available. Generate concepts first.'}
       title: "Shot List",
       description: "Cinematography guide",
       action: exportShotList,
-      available: true,
+      available: concepts.length > 0,
     },
     {
       icon: Package,
       title: "Brand Assets Pack",
       description: "Complete brand export",
       action: exportBrandPack,
-      available: true,
+      available: !!brandAnalysis,
     },
   ];
 
@@ -193,8 +199,8 @@ ${shotList || 'No shot list available. Generate concepts first.'}
           <p className="text-xs text-muted-foreground">Concepts</p>
         </div>
         <div className="text-center">
-          <p className="text-2xl font-bold text-gradient-gold">1</p>
-          <p className="text-xs text-muted-foreground">Config</p>
+          <p className="text-2xl font-bold text-gradient-gold">{structuredPrompt ? 1 : 0}</p>
+          <p className="text-xs text-muted-foreground">Prompts</p>
         </div>
       </div>
     </motion.section>

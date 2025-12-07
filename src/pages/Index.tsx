@@ -7,10 +7,20 @@ import JsonPanel from "@/components/JsonPanel";
 import PreviewPane from "@/components/PreviewPane";
 import ExportCenter from "@/components/ExportCenter";
 import ConceptCards from "@/components/ConceptCards";
-import { FiboConfig, DEFAULT_FIBO_CONFIG, BrandAnalysis, AdConcept, GeneratedImage } from "@/types/fibo";
+import { 
+  AppConfig, 
+  DEFAULT_APP_CONFIG, 
+  BrandAnalysis, 
+  AdConcept, 
+  GeneratedImage,
+  FiboStructuredPrompt,
+  buildStructuredPrompt
+} from "@/types/fibo";
 
 const Index = () => {
-  const [fiboConfig, setFiboConfig] = useState<FiboConfig>(DEFAULT_FIBO_CONFIG);
+  const [appConfig, setAppConfig] = useState<AppConfig>(DEFAULT_APP_CONFIG);
+  const [structuredPrompt, setStructuredPrompt] = useState<FiboStructuredPrompt | null>(null);
+  const [aspectRatio, setAspectRatio] = useState<string>("1:1");
   const [brandAnalysis, setBrandAnalysis] = useState<BrandAnalysis | null>(null);
   const [concepts, setConcepts] = useState<AdConcept[]>([]);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
@@ -22,12 +32,30 @@ const Index = () => {
     
     // Auto-load first concept into editor
     if (newConcepts.length > 0) {
-      setFiboConfig(newConcepts[0].fibo_config);
+      setStructuredPrompt(newConcepts[0].structured_prompt);
+      setAspectRatio(newConcepts[0].aspect_ratio);
     }
   };
 
-  const handleSelectConcept = (config: FiboConfig) => {
-    setFiboConfig(config);
+  const handleSelectConcept = (prompt: FiboStructuredPrompt, ratio: string) => {
+    setStructuredPrompt(prompt);
+    setAspectRatio(ratio);
+  };
+
+  // When app config changes, rebuild the structured prompt
+  const handleConfigChange = (newConfig: AppConfig) => {
+    setAppConfig(newConfig);
+    setAspectRatio(newConfig.aspect_ratio);
+    
+    // Rebuild structured prompt based on new config
+    if (structuredPrompt) {
+      const updatedPrompt = buildStructuredPrompt(
+        newConfig, 
+        appConfig.subject_description || 'Premium product',
+        brandAnalysis?.category || 'Premium Brand'
+      );
+      setStructuredPrompt(updatedPrompt);
+    }
   };
 
   return (
@@ -53,7 +81,7 @@ const Index = () => {
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Generate production-grade advertising visuals with JSON-native 
-            cinematography controls. Powered by Bria FIBO.
+            cinematography controls. Powered by Bria FIBO API v2.
           </p>
         </motion.section>
 
@@ -73,21 +101,22 @@ const Index = () => {
             />
             
             <CameraDirector 
-              config={fiboConfig} 
-              onChange={setFiboConfig} 
+              config={appConfig} 
+              onChange={handleConfigChange} 
             />
           </div>
 
           {/* Center Column - Preview */}
           <div className="lg:col-span-4 space-y-6">
             <PreviewPane 
-              config={fiboConfig}
+              structuredPrompt={structuredPrompt}
+              aspectRatio={aspectRatio}
               generatedImages={generatedImages}
               setGeneratedImages={setGeneratedImages}
             />
             
             <ExportCenter 
-              config={fiboConfig}
+              structuredPrompt={structuredPrompt}
               generatedImages={generatedImages}
               brandAnalysis={brandAnalysis}
               concepts={concepts}
@@ -97,8 +126,8 @@ const Index = () => {
           {/* Right Column - JSON */}
           <div className="lg:col-span-4">
             <JsonPanel 
-              config={fiboConfig} 
-              onChange={setFiboConfig} 
+              structuredPrompt={structuredPrompt} 
+              onChange={setStructuredPrompt} 
             />
           </div>
         </div>
@@ -134,7 +163,7 @@ const Index = () => {
 
         {/* Footer */}
         <footer className="mt-12 text-center text-sm text-muted-foreground">
-          <p>FIBO Ad Director • JSON-Native Creative Engine • Powered by Bria FIBO</p>
+          <p>FIBO Ad Director • JSON-Native Creative Engine • Powered by Bria FIBO API v2</p>
         </footer>
       </main>
     </div>

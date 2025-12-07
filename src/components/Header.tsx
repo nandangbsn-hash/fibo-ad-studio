@@ -1,16 +1,25 @@
-import { Camera, Sparkles } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
+import { Sparkles, Film, Camera } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const Header = () => {
+  const location = useLocation();
+
+  const navItems = [
+    { path: "/", label: "Ad Director", icon: Sparkles },
+    { path: "/feed", label: "Feed", icon: Film },
+  ];
+
   return (
-    <motion.header 
+    <motion.header
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
       className="fixed top-0 left-0 right-0 z-50 glass-panel border-t-0 rounded-t-none"
     >
       <div className="container mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <Link to="/" className="flex items-center gap-3">
             <div className="relative">
               <div className="absolute inset-0 bg-primary/30 blur-xl rounded-full" />
               <div className="relative p-2 bg-gradient-gold rounded-xl">
@@ -21,21 +30,24 @@ const Header = () => {
               <h1 className="text-xl font-bold text-gradient-gold">FIBO Ad Director</h1>
               <p className="text-xs text-muted-foreground">JSON-Native Creative Engine</p>
             </div>
-          </div>
+          </Link>
           
-          <nav className="hidden md:flex items-center gap-6">
-            <a href="#brand" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Brand Intake
-            </a>
-            <a href="#director" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Camera Director
-            </a>
-            <a href="#preview" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Preview
-            </a>
-            <a href="#export" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Export
-            </a>
+          <nav className="flex items-center gap-1">
+            {navItems.map((item) => (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
+                  location.pathname === item.path
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                )}
+              >
+                <item.icon className="w-4 h-4" />
+                {item.label}
+              </Link>
+            ))}
           </nav>
 
           <div className="flex items-center gap-2">

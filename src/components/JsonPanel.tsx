@@ -11,17 +11,52 @@ interface JsonPanelProps {
   onChange: (structuredPrompt: FiboStructuredPrompt) => void;
 }
 
+const DEFAULT_PROMPT: FiboStructuredPrompt = {
+  short_description: "A photorealistic product photograph of a premium item on a clean background.",
+  objects: [
+    {
+      description: "A premium product with sleek design",
+      location: "center",
+      relative_size: "large within frame",
+      shape_and_color: "Elegant design with premium materials",
+      texture: "smooth, premium finish",
+      appearance_details: "High-quality product photography style"
+    }
+  ],
+  background_setting: "clean, seamless white studio backdrop",
+  lighting: {
+    conditions: "bright, even studio lighting",
+    direction: "diffused from multiple sources",
+    shadows: "soft, subtle shadows adding depth"
+  },
+  aesthetics: {
+    composition: "centered composition",
+    color_scheme: "neutral, elegant",
+    mood_atmosphere: "professional, clean",
+    preference_score: "high",
+    aesthetic_score: "high"
+  },
+  photographic_characteristics: {
+    depth_of_field: "shallow",
+    focus: "sharp focus on subject",
+    camera_angle: "eye-level",
+    lens_focal_length: "portrait (85mm)"
+  },
+  style_medium: "photograph",
+  context: "Professional product photography for advertising.",
+  artistic_style: "photorealistic, commercial"
+};
+
 const JsonPanel = ({ structuredPrompt, onChange }: JsonPanelProps) => {
-  const [jsonString, setJsonString] = useState("");
+  const currentPrompt = structuredPrompt || DEFAULT_PROMPT;
+  const [jsonString, setJsonString] = useState(JSON.stringify(currentPrompt, null, 2));
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
-    if (structuredPrompt) {
-      setJsonString(JSON.stringify(structuredPrompt, null, 2));
-      setError(null);
-    }
+    setJsonString(JSON.stringify(currentPrompt, null, 2));
+    setError(null);
   }, [structuredPrompt]);
 
   const handleEditorChange = (value: string | undefined) => {
@@ -48,10 +83,8 @@ const JsonPanel = ({ structuredPrompt, onChange }: JsonPanelProps) => {
   };
 
   const handleReset = () => {
-    if (structuredPrompt) {
-      setJsonString(JSON.stringify(structuredPrompt, null, 2));
-      setError(null);
-    }
+    setJsonString(JSON.stringify(currentPrompt, null, 2));
+    setError(null);
     toast({
       title: "Reset",
       description: "JSON reset to current structured prompt",

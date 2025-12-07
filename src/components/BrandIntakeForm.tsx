@@ -5,8 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { BrandIntake, BrandAnalysis, AdConcept, DEFAULT_FIBO_CONFIG } from "@/types/fibo";
-import { normalizeFiboConfig, normalizeConcepts } from "@/utils/fiboHelpers";
+import { BrandIntake, BrandAnalysis, AdConcept, DEFAULT_APP_CONFIG, FiboStructuredPrompt } from "@/types/fibo";
 
 interface BrandIntakeFormProps {
   onAnalysisComplete: (analysis: BrandAnalysis, concepts: AdConcept[]) => void;
@@ -40,8 +39,14 @@ const BrandIntakeForm = ({ onAnalysisComplete, isLoading, setIsLoading }: BrandI
       const data = await response.json();
       
       if (data.success && data.concepts) {
-        // Normalize the concepts to match our expected structure
-        const normalizedConcepts = normalizeConcepts(data.concepts);
+        // Normalize the concepts to ensure proper structure
+        const normalizedConcepts: AdConcept[] = data.concepts.map((c: any) => ({
+          name: c.name,
+          description: c.description,
+          structured_prompt: c.structured_prompt,
+          shot_list: c.shot_list || [],
+          aspect_ratio: c.aspect_ratio || '1:1'
+        }));
         onAnalysisComplete(data.brand_analysis, normalizedConcepts);
       } else {
         throw new Error(data.error || 'Analysis failed');
@@ -53,23 +58,53 @@ const BrandIntakeForm = ({ onAnalysisComplete, isLoading, setIsLoading }: BrandI
         category: "Premium Lifestyle",
         tone: "Sophisticated & Modern",
         key_values: ["Quality", "Innovation", "Elegance"],
-        recommended_palette: "brand_warm_luxury"
+        recommended_palette: "Deep blacks, gold accents"
       };
       
-      // Create properly structured demo concept
-      const demoConfig = { ...DEFAULT_FIBO_CONFIG };
-      demoConfig.input.subject.name = formData.brandName || "Premium Product";
-      demoConfig.input.subject.brand = formData.brandName || "BRAND";
-      demoConfig.input.subject.context = formData.productDescription || "premium lifestyle advertising";
-      demoConfig.input.ad_intent.mood = formData.mood || "sleek, luxurious";
-      demoConfig.input.ad_intent.target_audience = formData.targetAudience || "urban premium buyers";
+      // Create a FIBO-compatible structured prompt for demo
+      const demoStructuredPrompt: FiboStructuredPrompt = {
+        short_description: `A photorealistic, high-quality product photograph of ${formData.productDescription || 'a premium product'} for ${formData.brandName || 'BRAND'}. The scene has an elegant, luxurious atmosphere with professional studio lighting.`,
+        objects: [
+          {
+            description: formData.productDescription || 'A premium product with sleek design',
+            location: 'center',
+            relative_size: 'large within frame',
+            shape_and_color: 'Elegant design with premium materials',
+            texture: 'smooth, premium finish',
+            appearance_details: 'High-quality product photography style, photorealistic'
+          }
+        ],
+        background_setting: 'clean, seamless white studio backdrop',
+        lighting: {
+          conditions: 'bright, even studio lighting',
+          direction: 'diffused from multiple sources',
+          shadows: 'soft, subtle shadows adding depth'
+        },
+        aesthetics: {
+          composition: 'centered composition',
+          color_scheme: formData.colorScheme || 'warm, harmonious',
+          mood_atmosphere: formData.mood || 'elegant, luxurious, sophisticated',
+          preference_score: 'very high',
+          aesthetic_score: 'very high'
+        },
+        photographic_characteristics: {
+          depth_of_field: 'shallow',
+          focus: 'sharp focus on subject',
+          camera_angle: 'eye-level',
+          lens_focal_length: 'portrait (85mm)'
+        },
+        style_medium: 'photograph',
+        context: `Professional advertising image for ${formData.brandName || 'BRAND'}, targeting ${formData.targetAudience || 'premium buyers'}.`,
+        artistic_style: 'photorealistic, detailed'
+      };
       
       const demoConcepts: AdConcept[] = [
         {
           name: "Hero Spotlight",
           description: "Dramatic product showcase with studio lighting",
-          fibo_config: demoConfig,
-          shot_list: ["Hero wide shot", "Detail macro", "Lifestyle context", "Brand lockup"]
+          structured_prompt: demoStructuredPrompt,
+          shot_list: ["Hero wide shot", "Detail macro", "Lifestyle context", "Brand lockup"],
+          aspect_ratio: "1:1"
         }
       ];
       onAnalysisComplete(demoAnalysis, demoConcepts);

@@ -1,22 +1,15 @@
 import { motion } from "framer-motion";
 import { Lightbulb, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { AdConcept, FiboConfig } from "@/types/fibo";
-import { normalizeFiboConfig } from "@/utils/fiboHelpers";
+import { AdConcept, FiboStructuredPrompt } from "@/types/fibo";
 
 interface ConceptCardsProps {
   concepts: AdConcept[];
-  onSelectConcept: (config: FiboConfig) => void;
+  onSelectConcept: (structuredPrompt: FiboStructuredPrompt, aspectRatio: string) => void;
 }
 
 const ConceptCards = ({ concepts, onSelectConcept }: ConceptCardsProps) => {
   if (concepts.length === 0) return null;
-
-  const handleSelectConcept = (rawConfig: any) => {
-    // Ensure the config is properly normalized before passing to parent
-    const normalized = normalizeFiboConfig(rawConfig);
-    onSelectConcept(normalized);
-  };
 
   return (
     <motion.section
@@ -30,7 +23,7 @@ const ConceptCards = ({ concepts, onSelectConcept }: ConceptCardsProps) => {
         </div>
         <div>
           <h2 className="text-lg font-semibold">Generated Concepts</h2>
-          <p className="text-sm text-muted-foreground">Click to load into Camera Director</p>
+          <p className="text-sm text-muted-foreground">Click to load FIBO structured prompt</p>
         </div>
       </div>
 
@@ -42,13 +35,18 @@ const ConceptCards = ({ concepts, onSelectConcept }: ConceptCardsProps) => {
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: idx * 0.1 }}
             className="group relative p-4 bg-muted/30 rounded-xl border border-border/50 hover:border-primary/50 transition-all cursor-pointer"
-            onClick={() => handleSelectConcept(concept.fibo_config)}
+            onClick={() => onSelectConcept(concept.structured_prompt, concept.aspect_ratio)}
           >
             <div className="flex items-start justify-between gap-4">
               <div className="space-y-2 flex-1">
-                <h3 className="font-medium text-foreground group-hover:text-primary transition-colors">
-                  {concept.name}
-                </h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-medium text-foreground group-hover:text-primary transition-colors">
+                    {concept.name}
+                  </h3>
+                  <span className="text-xs px-2 py-0.5 bg-primary/10 rounded-full text-primary">
+                    {concept.aspect_ratio}
+                  </span>
+                </div>
                 <p className="text-sm text-muted-foreground line-clamp-2">
                   {concept.description}
                 </p>

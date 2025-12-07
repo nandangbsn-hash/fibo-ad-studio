@@ -2,21 +2,31 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ImageIcon, Sparkles, Loader2, Download, ExternalLink, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { FiboConfig, GeneratedImage } from "@/types/fibo";
+import { FiboStructuredPrompt, GeneratedImage } from "@/types/fibo";
 import { useToast } from "@/hooks/use-toast";
 
 interface PreviewPaneProps {
-  config: FiboConfig;
+  structuredPrompt: FiboStructuredPrompt | null;
+  aspectRatio: string;
   generatedImages: GeneratedImage[];
   setGeneratedImages: (images: GeneratedImage[]) => void;
 }
 
-const PreviewPane = ({ config, generatedImages, setGeneratedImages }: PreviewPaneProps) => {
+const PreviewPane = ({ structuredPrompt, aspectRatio, generatedImages, setGeneratedImages }: PreviewPaneProps) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const { toast } = useToast();
 
   const handleGenerate = async () => {
+    if (!structuredPrompt) {
+      toast({
+        title: "No Prompt Available",
+        description: "Generate a concept or create a structured prompt first",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsGenerating(true);
     
     try {
@@ -26,22 +36,30 @@ const PreviewPane = ({ config, generatedImages, setGeneratedImages }: PreviewPan
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({ fiboJson: config }),
+        body: JSON.stringify({ 
+          structured_prompt: structuredPrompt,
+          aspect_ratio: aspectRatio,
+          sync: true
+        }),
       });
 
       const data = await response.json();
       
-      if (data.success) {
-        setGeneratedImages(data.images || []);
-        setSelectedImage(data.images?.[0]?.url || null);
+      if (data.success && data.image_url) {
+        const newImage: GeneratedImage = {
+          url: data.image_url,
+          id: data.request_id || `gen-${Date.now()}`,
+          seed: data.seed,
+          structured_prompt: data.structured_prompt
+        };
+        setGeneratedImages([newImage, ...generatedImages]);
+        setSelectedImage(newImage.url);
         toast({
-          title: data.demo_mode ? "Demo Preview Generated" : "Images Generated!",
-          description: data.demo_mode 
-            ? "Using demo images (FIBO API simulation)" 
-            : `${data.images?.length || 0} variations created`,
+          title: "Image Generated!",
+          description: `Seed: ${data.seed}`,
         });
       } else {
-        throw new Error(data.error);
+        throw new Error(data.error || 'Generation failed');
       }
     } catch (error) {
       console.error('Error generating:', error);
@@ -70,13 +88,13 @@ const PreviewPane = ({ config, generatedImages, setGeneratedImages }: PreviewPan
           </div>
           <div>
             <h2 className="text-lg font-semibold">Preview</h2>
-            <p className="text-sm text-muted-foreground">Real-time FIBO generation</p>
+            <p className="text-sm text-muted-foreground">Bria FIBO generation</p>
           </div>
         </div>
 
         <Button
           onClick={handleGenerate}
-          disabled={isGenerating}
+          disabled={isGenerating || !structuredPrompt}
           className="bg-gradient-gold text-primary-foreground font-semibold glow-gold btn-premium"
         >
           {isGenerating ? (
@@ -87,7 +105,7 @@ const PreviewPane = ({ config, generatedImages, setGeneratedImages }: PreviewPan
           ) : (
             <>
               <Zap className="w-4 h-4 mr-2" />
-              Generate Preview
+              Generate with FIBO
             </>
           )}
         </Button>
@@ -117,7 +135,7 @@ const PreviewPane = ({ config, generatedImages, setGeneratedImages }: PreviewPan
               </div>
               <div className="text-center">
                 <p className="font-medium">No preview yet</p>
-                <p className="text-sm">Click "Generate Preview" to create your ad</p>
+                <p className="text-sm">Generate a concept and click "Generate with FIBO"</p>
               </div>
             </motion.div>
           )}
@@ -130,7 +148,7 @@ const PreviewPane = ({ config, generatedImages, setGeneratedImages }: PreviewPan
                 <div className="absolute inset-0 bg-primary/30 blur-2xl rounded-full animate-pulse" />
                 <Loader2 className="w-16 h-16 text-primary animate-spin relative" />
               </div>
-              <p className="text-sm text-muted-foreground">Generating with FIBO...</p>
+              <p className="text-sm text-muted-foreground">Generating with Bria FIBO...</p>
             </div>
           </div>
         )}
@@ -139,9 +157,9 @@ const PreviewPane = ({ config, generatedImages, setGeneratedImages }: PreviewPan
       {/* Variations Grid */}
       {generatedImages.length > 0 && (
         <div className="space-y-3">
-          <h3 className="text-sm font-medium text-muted-foreground">Variations</h3>
+          <h3 className="text-sm font-medium text-muted-foreground">Generated Images</h3>
           <div className="grid grid-cols-3 gap-3">
-            {generatedImages.map((img, idx) => (
+            {generatedImages.slice(0, 6).map((img, idx) => (
               <motion.button
                 key={img.id}
                 initial={{ opacity: 0, y: 10 }}
@@ -156,7 +174,7 @@ const PreviewPane = ({ config, generatedImages, setGeneratedImages }: PreviewPan
               >
                 <img
                   src={img.url}
-                  alt={`Variation ${idx + 1}`}
+                  alt={`Generation ${idx + 1}`}
                   className="w-full h-full object-cover"
                 />
                 {selectedImage === img.url && (

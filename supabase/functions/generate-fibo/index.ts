@@ -88,6 +88,40 @@ serve(async (req) => {
           if (a.color_scheme) parts.push(`Colors: ${a.color_scheme}`);
         }
         
+        // Include color palette from visual_and_color
+        if (sp.visual_and_color) {
+          const vc = sp.visual_and_color;
+          
+          // Add color palette with explicit color instructions
+          if (vc.color_palette && Array.isArray(vc.color_palette) && vc.color_palette.length > 0) {
+            const colorDescriptions = vc.color_palette.map((c: any, i: number) => {
+              const role = i === 0 ? 'primary' : i === 1 ? 'secondary' : 'accent';
+              return `${c.hex || `hsl(${c.hue}, ${c.saturation}%, ${c.lightness}%)`} as ${role}`;
+            });
+            parts.push(`Use a color scheme with ${colorDescriptions.join(', ')}. These colors should be prominently visible in the image`);
+          }
+          
+          // Add HDR settings
+          if (vc.hdr_enabled) {
+            parts.push('HDR enabled with high dynamic range, enhanced highlights and shadows');
+          }
+          
+          // Add bit depth for color richness
+          if (vc.color_bit_depth) {
+            parts.push(`${vc.color_bit_depth} color depth for ${vc.color_bit_depth === '16-bit' ? 'maximum' : vc.color_bit_depth === '12-bit' ? 'high' : 'standard'} color richness`);
+          }
+          
+          // Add tone adjustments
+          if (vc.tone_adjustments) {
+            const ta = vc.tone_adjustments;
+            const toneDesc: string[] = [];
+            if (ta.brightness && ta.brightness !== 0) toneDesc.push(`brightness ${ta.brightness > 0 ? 'increased' : 'decreased'}`);
+            if (ta.contrast && ta.contrast !== 0) toneDesc.push(`${ta.contrast > 0 ? 'high' : 'low'} contrast`);
+            if (ta.saturation && ta.saturation !== 0) toneDesc.push(`${ta.saturation > 0 ? 'vibrant' : 'muted'} saturation`);
+            if (toneDesc.length > 0) parts.push(`Tone: ${toneDesc.join(', ')}`);
+          }
+        }
+        
         if (sp.photographic_characteristics) {
           const p = sp.photographic_characteristics;
           if (p.camera_angle) parts.push(`Camera: ${p.camera_angle}`);

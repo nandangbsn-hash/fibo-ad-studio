@@ -52,13 +52,11 @@ const Index = () => {
     setAppConfig(newConfig);
     setAspectRatio(newConfig.aspect_ratio);
     
-    // Always rebuild structured prompt with the current subject description
-    const subject = newConfig.subject_description || 
-                    brandAnalysis?.category || 
-                    'Premium product';
-    const brand = brandAnalysis?.category || 'Premium Brand';
-    
-    const updatedPrompt = buildStructuredPrompt(newConfig, subject, brand);
+    // Update structured prompt with new description
+    const updatedPrompt = createDefaultStructuredPrompt(
+      newConfig.subject_description || 'Premium product',
+      brandAnalysis?.category || 'Premium Brand'
+    );
     setStructuredPrompt(updatedPrompt);
   };
 

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { BrandIntake, BrandAnalysis, AdConcept, FiboStructuredPrompt } from "@/types/fibo";
+import { BrandIntake, BrandAnalysis, AdConcept, createDefaultStructuredPrompt } from "@/types/fibo";
 
 interface BrandIntakeFormProps {
   onAnalysisComplete: (analysis: BrandAnalysis, concepts: AdConcept[], productDescription: string) => void;

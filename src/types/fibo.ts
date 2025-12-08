@@ -19,10 +19,85 @@ export interface FiboObject {
   skin_tone_and_texture?: string;
 }
 
+// Camera and Lens settings
+export interface FiboCameraAndLens {
+  camera_body: string;
+  lens_type: string;
+  focal_length_mm: number;
+  aperture_f_stop: number;
+  shot_preset: string;
+}
+
+// Geometry settings
+export interface FiboGeometry {
+  tilt_degrees: number;
+  pan_degrees: number;
+  roll_degrees: number;
+  distance_meters: number;
+}
+
+// Key/Fill/Rim light settings
+export interface FiboLightSource {
+  intensity_percent: number;
+  softness_percent?: number;
+  temperature_kelvin?: number;
+}
+
+// Comprehensive lighting settings
 export interface FiboLighting {
+  lighting_type: string;
+  key_light: FiboLightSource;
+  fill_light: FiboLightSource;
+  rim_light: FiboLightSource;
   conditions: string;
   direction: string;
   shadows: string;
+}
+
+// Focus and motion settings
+export interface FiboFocusAndMotion {
+  focus_distance_meters: number;
+  shutter_angle_degrees: number;
+  shutter_speed: string;
+  depth_of_field: string;
+  focus: string;
+}
+
+// Sensor and exposure settings
+export interface FiboSensorAndExposure {
+  iso: number;
+  exposure_compensation_ev: number;
+  white_balance_kelvin: number;
+  dynamic_range_percent: number;
+}
+
+// Tone adjustments
+export interface FiboToneAdjustments {
+  brightness_percent: number;
+  contrast_percent: number;
+  saturation_percent: number;
+  vibrance_percent: number;
+  clarity_percent: number;
+}
+
+// Luminance controls
+export interface FiboLuminanceControls {
+  highlights_percent: number;
+  shadows_percent: number;
+  whites_percent: number;
+  blacks_percent: number;
+}
+
+// Visual and color settings
+export interface FiboVisualAndColor {
+  hdr_enabled: boolean;
+  color_bit_depth: string;
+  color_space: string;
+  tone_mapping: string;
+  color_grading: string;
+  mood_filter: string;
+  tone_adjustments: FiboToneAdjustments;
+  luminance_controls: FiboLuminanceControls;
 }
 
 export interface FiboAesthetics {
@@ -34,10 +109,7 @@ export interface FiboAesthetics {
 }
 
 export interface FiboPhotographicCharacteristics {
-  depth_of_field: string;
-  focus: string;
   camera_angle: string;
-  lens_focal_length: string;
 }
 
 export interface FiboTextRender {
@@ -49,12 +121,17 @@ export interface FiboTextRender {
   appearance_details: string;
 }
 
-// Main FIBO Structured Prompt (matches Bria API response format)
+// Main FIBO Structured Prompt (comprehensive format)
 export interface FiboStructuredPrompt {
   short_description: string;
   objects: FiboObject[];
   background_setting: string;
+  camera_and_lens: FiboCameraAndLens;
+  geometry: FiboGeometry;
   lighting: FiboLighting;
+  focus_and_motion: FiboFocusAndMotion;
+  sensor_and_exposure: FiboSensorAndExposure;
+  visual_and_color: FiboVisualAndColor;
   aesthetics: FiboAesthetics;
   photographic_characteristics: FiboPhotographicCharacteristics;
   style_medium: string;
@@ -321,10 +398,61 @@ export function buildStructuredPrompt(
       }
     ],
     background_setting: config.composition.background,
+    camera_and_lens: {
+      camera_body: 'cinema_arri_red',
+      lens_type: 'prime',
+      focal_length_mm: 85,
+      aperture_f_stop: 2.8,
+      shot_preset: 'medium'
+    },
+    geometry: {
+      tilt_degrees: 0,
+      pan_degrees: 0,
+      roll_degrees: 0,
+      distance_meters: 3
+    },
     lighting: {
+      lighting_type: 'soft_box',
+      key_light: { intensity_percent: 100, softness_percent: 50, temperature_kelvin: 5600 },
+      fill_light: { intensity_percent: 50 },
+      rim_light: { intensity_percent: 70 },
       conditions: config.lighting.conditions,
       direction: config.lighting.direction,
       shadows: 'soft, subtle shadows adding depth'
+    },
+    focus_and_motion: {
+      focus_distance_meters: 3,
+      shutter_angle_degrees: 180,
+      shutter_speed: '1/50s',
+      depth_of_field: config.camera.depth_of_field,
+      focus: 'sharp focus on subject'
+    },
+    sensor_and_exposure: {
+      iso: 400,
+      exposure_compensation_ev: 0,
+      white_balance_kelvin: 5600,
+      dynamic_range_percent: 80
+    },
+    visual_and_color: {
+      hdr_enabled: false,
+      color_bit_depth: '8-bit',
+      color_space: 'sRGB',
+      tone_mapping: 'none',
+      color_grading: 'none',
+      mood_filter: 'none',
+      tone_adjustments: {
+        brightness_percent: 50,
+        contrast_percent: 50,
+        saturation_percent: 50,
+        vibrance_percent: 50,
+        clarity_percent: 50
+      },
+      luminance_controls: {
+        highlights_percent: 50,
+        shadows_percent: 50,
+        whites_percent: 50,
+        blacks_percent: 50
+      }
     },
     aesthetics: {
       composition: `${config.composition.layout} composition`,
@@ -334,13 +462,30 @@ export function buildStructuredPrompt(
       aesthetic_score: 'very high'
     },
     photographic_characteristics: {
-      depth_of_field: config.camera.depth_of_field,
-      focus: 'sharp focus on subject',
-      camera_angle: config.camera.angle,
-      lens_focal_length: config.camera.focal_length
+      camera_angle: config.camera.angle
     },
     style_medium: config.style.medium,
     context: `Professional advertising image for ${brand}, targeting premium quality and brand aesthetics.`,
     artistic_style: config.style.artistic_style
+  };
+}
+
+// Helper to create a default structured prompt
+export function createDefaultStructuredPrompt(description?: string, brandName?: string): FiboStructuredPrompt {
+  return {
+    short_description: description || "A photorealistic product photograph with cinematic lighting.",
+    objects: [{ description: description || "Subject as described", location: "center", relative_size: "large within frame", shape_and_color: "As specified", texture: "realistic", appearance_details: "High-quality photography" }],
+    background_setting: "clean studio backdrop",
+    camera_and_lens: { camera_body: "cinema_arri_red", lens_type: "prime", focal_length_mm: 85, aperture_f_stop: 2.8, shot_preset: "medium" },
+    geometry: { tilt_degrees: 0, pan_degrees: 0, roll_degrees: 0, distance_meters: 3 },
+    lighting: { lighting_type: "soft_box", key_light: { intensity_percent: 100, softness_percent: 50, temperature_kelvin: 5600 }, fill_light: { intensity_percent: 50 }, rim_light: { intensity_percent: 70 }, conditions: "studio lighting", direction: "diffused", shadows: "soft shadows" },
+    focus_and_motion: { focus_distance_meters: 3, shutter_angle_degrees: 180, shutter_speed: "1/50s", depth_of_field: "shallow", focus: "sharp focus on subject" },
+    sensor_and_exposure: { iso: 400, exposure_compensation_ev: 0, white_balance_kelvin: 5600, dynamic_range_percent: 80 },
+    visual_and_color: { hdr_enabled: false, color_bit_depth: "8-bit", color_space: "sRGB", tone_mapping: "none", color_grading: "none", mood_filter: "none", tone_adjustments: { brightness_percent: 50, contrast_percent: 50, saturation_percent: 50, vibrance_percent: 50, clarity_percent: 50 }, luminance_controls: { highlights_percent: 50, shadows_percent: 50, whites_percent: 50, blacks_percent: 50 } },
+    aesthetics: { composition: "centered composition", color_scheme: "neutral", mood_atmosphere: "professional", preference_score: "high", aesthetic_score: "high" },
+    photographic_characteristics: { camera_angle: "eye-level" },
+    style_medium: "photograph",
+    context: brandName ? `Professional image for ${brandName}.` : "Professional photography.",
+    artistic_style: "photorealistic"
   };
 }

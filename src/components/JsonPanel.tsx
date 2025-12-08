@@ -12,39 +12,87 @@ interface JsonPanelProps {
 }
 
 const DEFAULT_PROMPT: FiboStructuredPrompt = {
-  short_description: "A photorealistic product photograph of a premium item on a clean background.",
+  short_description: "A photorealistic product photograph with cinematic lighting.",
   objects: [
     {
-      description: "A premium product with sleek design",
+      description: "Subject as described",
       location: "center",
       relative_size: "large within frame",
-      shape_and_color: "Elegant design with premium materials",
-      texture: "smooth, premium finish",
-      appearance_details: "High-quality product photography style"
+      shape_and_color: "As specified in prompt",
+      texture: "realistic, detailed surface",
+      appearance_details: "High-quality photography style"
     }
   ],
-  background_setting: "clean, seamless white studio backdrop",
+  background_setting: "clean studio backdrop",
+  camera_and_lens: {
+    camera_body: "cinema_arri_red",
+    lens_type: "prime",
+    focal_length_mm: 85,
+    aperture_f_stop: 2.8,
+    shot_preset: "medium"
+  },
+  geometry: {
+    tilt_degrees: 0,
+    pan_degrees: 0,
+    roll_degrees: 0,
+    distance_meters: 3
+  },
   lighting: {
-    conditions: "bright, even studio lighting",
+    lighting_type: "soft_box",
+    key_light: { intensity_percent: 100, softness_percent: 50, temperature_kelvin: 5600 },
+    fill_light: { intensity_percent: 50 },
+    rim_light: { intensity_percent: 70 },
+    conditions: "studio lighting",
     direction: "diffused from multiple sources",
-    shadows: "soft, subtle shadows adding depth"
+    shadows: "soft shadows"
+  },
+  focus_and_motion: {
+    focus_distance_meters: 3,
+    shutter_angle_degrees: 180,
+    shutter_speed: "1/50s",
+    depth_of_field: "shallow",
+    focus: "sharp focus on subject"
+  },
+  sensor_and_exposure: {
+    iso: 400,
+    exposure_compensation_ev: 0,
+    white_balance_kelvin: 5600,
+    dynamic_range_percent: 80
+  },
+  visual_and_color: {
+    hdr_enabled: false,
+    color_bit_depth: "8-bit",
+    color_space: "sRGB",
+    tone_mapping: "none",
+    color_grading: "none",
+    mood_filter: "none",
+    tone_adjustments: {
+      brightness_percent: 50,
+      contrast_percent: 50,
+      saturation_percent: 50,
+      vibrance_percent: 50,
+      clarity_percent: 50
+    },
+    luminance_controls: {
+      highlights_percent: 50,
+      shadows_percent: 50,
+      whites_percent: 50,
+      blacks_percent: 50
+    }
   },
   aesthetics: {
     composition: "centered composition",
-    color_scheme: "neutral, elegant",
-    mood_atmosphere: "professional, clean",
+    color_scheme: "neutral",
+    mood_atmosphere: "professional",
     preference_score: "high",
     aesthetic_score: "high"
   },
   photographic_characteristics: {
-    depth_of_field: "shallow",
-    focus: "sharp focus on subject",
-    camera_angle: "eye-level",
-    lens_focal_length: "portrait (85mm)"
+    camera_angle: "eye-level"
   },
   style_medium: "photograph",
-  context: "Professional product photography for advertising.",
-  artistic_style: "photorealistic, commercial"
+  context: "Professional photography.",
+  artistic_style: "photorealistic"
 };
 
 const JsonPanel = ({ structuredPrompt, onChange }: JsonPanelProps) => {

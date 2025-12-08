@@ -62,41 +62,10 @@ const BrandIntakeForm = ({ onAnalysisComplete, isLoading, setIsLoading }: BrandI
       };
       
       // Create a FIBO-compatible structured prompt for demo
-      const demoStructuredPrompt: FiboStructuredPrompt = {
-        short_description: `A photorealistic, high-quality product photograph of ${formData.productDescription || 'a premium product'} for ${formData.brandName || 'BRAND'}. The scene has an elegant, luxurious atmosphere with professional studio lighting.`,
-        objects: [
-          {
-            description: formData.productDescription || 'A premium product with sleek design',
-            location: 'center',
-            relative_size: 'large within frame',
-            shape_and_color: 'Elegant design with premium materials',
-            texture: 'smooth, premium finish',
-            appearance_details: 'High-quality product photography style, photorealistic'
-          }
-        ],
-        background_setting: 'clean, seamless white studio backdrop',
-        lighting: {
-          conditions: 'bright, even studio lighting',
-          direction: 'diffused from multiple sources',
-          shadows: 'soft, subtle shadows adding depth'
-        },
-        aesthetics: {
-          composition: 'centered composition',
-          color_scheme: formData.colorScheme || 'warm, harmonious',
-          mood_atmosphere: formData.mood || 'elegant, luxurious, sophisticated',
-          preference_score: 'very high',
-          aesthetic_score: 'very high'
-        },
-        photographic_characteristics: {
-          depth_of_field: 'shallow',
-          focus: 'sharp focus on subject',
-          camera_angle: 'eye-level',
-          lens_focal_length: 'portrait (85mm)'
-        },
-        style_medium: 'photograph',
-        context: `Professional advertising image for ${formData.brandName || 'BRAND'}, targeting ${formData.targetAudience || 'premium buyers'}.`,
-        artistic_style: 'photorealistic, detailed'
-      };
+      const demoStructuredPrompt = createDefaultStructuredPrompt(
+        formData.productDescription || 'A premium product with sleek design',
+        formData.brandName || 'BRAND'
+      );
       
       const demoConcepts: AdConcept[] = [
         {

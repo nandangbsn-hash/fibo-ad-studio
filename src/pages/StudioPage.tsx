@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Camera, Sun, Focus, Gauge, Lock, Unlock, Loader2, Sparkles, ImagePlus, Palette, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -51,40 +51,156 @@ const TONE_MAPPINGS = [
   { value: 'dolby_vision', label: 'Dolby Vision' },
 ];
 
-const DEFAULT_STUDIO_PROMPT: FiboStructuredPrompt = {
-  short_description: "A photorealistic product photograph with cinematic lighting.",
-  objects: [
-    {
-      description: "Subject as described",
-      location: "center",
-      relative_size: "large within frame",
-      shape_and_color: "As specified in prompt",
-      texture: "realistic, detailed surface",
-      appearance_details: "High-quality photography style"
-    }
-  ],
-  background_setting: "clean studio backdrop",
-  lighting: {
-    conditions: "studio lighting",
-    direction: "diffused from multiple sources",
-    shadows: "soft shadows"
-  },
-  aesthetics: {
-    composition: "centered composition",
-    color_scheme: "neutral",
-    mood_atmosphere: "professional",
-    preference_score: "high",
-    aesthetic_score: "high"
-  },
-  photographic_characteristics: {
-    depth_of_field: "shallow",
-    focus: "sharp focus on subject",
-    camera_angle: "eye-level",
-    lens_focal_length: "85mm"
-  },
-  style_medium: "photograph",
-  context: "Professional photography.",
-  artistic_style: "photorealistic"
+// Build complete structured prompt from all settings
+const buildCompleteStructuredPrompt = (
+  customPrompt: string,
+  cameraSettings: CameraSettings,
+  visualSettings: VisualSettings
+): FiboStructuredPrompt => {
+  const cameraBodyMap: Record<string, string> = {
+    'cinema': 'cinema_arri_red',
+    'dslr': 'dslr_canon_nikon',
+    'mirrorless': 'mirrorless_sony',
+    'mobile': 'mobile_camera',
+  };
+
+  const shotPresetMap: Record<string, string> = {
+    'extreme_wide': 'extreme wide shot',
+    'wide': 'wide shot',
+    'medium': 'medium shot',
+    'medium_closeup': 'medium close-up',
+    'closeup': 'close-up',
+    'extreme_closeup': 'extreme close-up',
+    'macro': 'macro shot',
+    'top_down': 'top-down shot',
+    'low_angle': 'low angle shot',
+    'high_angle': 'high angle shot',
+    'dutch_angle': 'dutch angle',
+    'over_shoulder': 'over-the-shoulder',
+    'pov': 'POV shot',
+    'isometric': 'isometric view',
+  };
+
+  const lightingTypeMap: Record<string, string> = {
+    'hard_studio': 'hard_studio',
+    'soft_box': 'soft_box',
+    'natural_sunlight': 'natural_sunlight',
+    'practical': 'practical_lights',
+    'neon_rgb': 'neon_rgb',
+    'volumetric': 'volumetric_fog',
+  };
+
+  const colorSpaceMap: Record<string, string> = {
+    'srgb': 'sRGB',
+    'adobe_rgb': 'Adobe RGB',
+    'dci_p3': 'DCI-P3',
+    'rec2020': 'Rec. 2020',
+  };
+
+  const depthOfField = cameraSettings.aperture <= 2 ? 'very shallow' :
+                       cameraSettings.aperture <= 4 ? 'shallow' :
+                       cameraSettings.aperture <= 8 ? 'medium' : 'deep';
+
+  const lightingConditions = cameraSettings.lighting_type === 'hard_studio' ? 'hard studio lighting with sharp shadows' :
+                             cameraSettings.lighting_type === 'soft_box' ? 'soft box lighting with gentle gradients' :
+                             cameraSettings.lighting_type === 'natural_sunlight' ? 'natural sunlight' :
+                             cameraSettings.lighting_type === 'practical' ? 'practical lights' :
+                             cameraSettings.lighting_type === 'neon_rgb' ? 'neon RGB lighting' :
+                             cameraSettings.lighting_type === 'volumetric' ? 'volumetric fog lighting' : 'studio lighting';
+
+  const shadows = cameraSettings.key_light.softness > 0.5 ? 'soft shadows' : 'hard shadows';
+
+  return {
+    short_description: customPrompt || "A photorealistic product photograph with cinematic lighting.",
+    objects: [
+      {
+        description: customPrompt || "Subject as described",
+        location: "center",
+        relative_size: "large within frame",
+        shape_and_color: "As specified in prompt",
+        texture: "realistic, detailed surface",
+        appearance_details: "High-quality photography style"
+      }
+    ],
+    background_setting: "clean studio backdrop",
+    camera_and_lens: {
+      camera_body: cameraBodyMap[cameraSettings.camera_body] || cameraSettings.camera_body,
+      lens_type: cameraSettings.lens_type,
+      focal_length_mm: cameraSettings.focal_length_mm,
+      aperture_f_stop: cameraSettings.aperture,
+      shot_preset: cameraSettings.shot_preset
+    },
+    geometry: {
+      tilt_degrees: cameraSettings.tilt_angle,
+      pan_degrees: cameraSettings.pan_angle,
+      roll_degrees: cameraSettings.roll_angle,
+      distance_meters: cameraSettings.camera_distance
+    },
+    lighting: {
+      lighting_type: lightingTypeMap[cameraSettings.lighting_type] || cameraSettings.lighting_type,
+      key_light: {
+        intensity_percent: Math.round(cameraSettings.key_light.intensity * 100),
+        softness_percent: Math.round(cameraSettings.key_light.softness * 100),
+        temperature_kelvin: cameraSettings.key_light.color_temperature
+      },
+      fill_light: {
+        intensity_percent: Math.round(cameraSettings.fill_light.intensity * 100)
+      },
+      rim_light: {
+        intensity_percent: Math.round(cameraSettings.rim_light.intensity * 100)
+      },
+      conditions: lightingConditions,
+      direction: `key light intensity: ${Math.round(cameraSettings.key_light.intensity * 100)}%`,
+      shadows: shadows
+    },
+    focus_and_motion: {
+      focus_distance_meters: cameraSettings.focus_distance,
+      shutter_angle_degrees: cameraSettings.shutter_angle,
+      shutter_speed: `1/${cameraSettings.shutter_speed}s`,
+      depth_of_field: depthOfField,
+      focus: cameraSettings.auto_focus ? 'auto focus on subject' : `manual focus at ${cameraSettings.focus_distance}m`
+    },
+    sensor_and_exposure: {
+      iso: cameraSettings.iso,
+      exposure_compensation_ev: cameraSettings.exposure_compensation,
+      white_balance_kelvin: cameraSettings.white_balance,
+      dynamic_range_percent: cameraSettings.dynamic_range
+    },
+    visual_and_color: {
+      hdr_enabled: visualSettings.hdr_enabled,
+      color_bit_depth: `${visualSettings.color_bit_depth}-bit`,
+      color_space: colorSpaceMap[visualSettings.color_space] || visualSettings.color_space,
+      tone_mapping: visualSettings.tone_mapping,
+      color_grading: visualSettings.color_grading_preset,
+      mood_filter: visualSettings.mood_filter,
+      tone_adjustments: {
+        brightness_percent: visualSettings.brightness,
+        contrast_percent: visualSettings.contrast,
+        saturation_percent: visualSettings.saturation,
+        vibrance_percent: visualSettings.vibrance,
+        clarity_percent: visualSettings.clarity
+      },
+      luminance_controls: {
+        highlights_percent: visualSettings.highlights,
+        shadows_percent: visualSettings.shadows,
+        whites_percent: visualSettings.whites,
+        blacks_percent: visualSettings.blacks
+      }
+    },
+    aesthetics: {
+      composition: `${visualSettings.composition_layout} composition`,
+      color_scheme: visualSettings.color_palette,
+      mood_atmosphere: "professional",
+      preference_score: "high",
+      aesthetic_score: "high"
+    },
+    photographic_characteristics: {
+      camera_angle: shotPresetMap[cameraSettings.shot_preset] || 'eye-level'
+    },
+    style_medium: "photograph",
+    context: "Professional photography.",
+    artistic_style: "photorealistic"
+  };
 };
 
 const StudioPage = () => {
@@ -95,61 +211,36 @@ const StudioPage = () => {
   const [aspectRatio, setAspectRatio] = useState("1:1");
   const [cameraSettings, setCameraSettings] = useState<CameraSettings>(DEFAULT_CAMERA_SETTINGS);
   const [visualSettings, setVisualSettings] = useState<VisualSettings>(DEFAULT_VISUAL_SETTINGS);
-  const [structuredPrompt, setStructuredPrompt] = useState<FiboStructuredPrompt>(DEFAULT_STUDIO_PROMPT);
+  const [structuredPrompt, setStructuredPrompt] = useState<FiboStructuredPrompt>(() => 
+    buildCompleteStructuredPrompt("", DEFAULT_CAMERA_SETTINGS, DEFAULT_VISUAL_SETTINGS)
+  );
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [lockedParams, setLockedParams] = useState<string[]>([]);
 
+  // Rebuild structured prompt whenever settings change
+  useEffect(() => {
+    setStructuredPrompt(buildCompleteStructuredPrompt(customPrompt, cameraSettings, visualSettings));
+  }, [customPrompt, cameraSettings, visualSettings]);
+
   // Update a visual setting
   const updateVisualSetting = <K extends keyof VisualSettings>(key: K, value: VisualSettings[K]) => {
-    const newSettings = { ...visualSettings, [key]: value };
-    setVisualSettings(newSettings);
-    updatePromptFromVisuals(newSettings);
-  };
-
-  // Update prompt from visual settings
-  const updatePromptFromVisuals = (settings: VisualSettings) => {
-    const colorDescMap: Record<string, string> = {
-      'srgb': 'standard color range',
-      'adobe_rgb': 'wide color gamut (Adobe RGB)',
-      'dci_p3': 'cinema-grade DCI-P3 color space',
-      'rec2020': 'HDR Rec. 2020 color space',
-    };
-    const toneMapDesc: Record<string, string> = {
-      'none': '',
-      'reinhard': 'with Reinhard tone mapping',
-      'aces': 'with ACES filmic tone mapping',
-      'hdr10': 'with HDR10 processing',
-      'dolby_vision': 'with Dolby Vision grading',
-    };
-    
-    setStructuredPrompt(prev => ({
-      ...prev,
-      aesthetics: {
-        ...prev.aesthetics,
-        color_scheme: `${settings.color_palette}, ${settings.color_bit_depth}-bit color depth, ${colorDescMap[settings.color_space] || 'standard'}${settings.hdr_enabled ? ', HDR enabled' : ''}`,
-        mood_atmosphere: `${prev.aesthetics.mood_atmosphere}${toneMapDesc[settings.tone_mapping] ? `, ${toneMapDesc[settings.tone_mapping]}` : ''}`,
-      },
-    }));
+    setVisualSettings(prev => ({ ...prev, [key]: value }));
   };
 
   // Update a camera setting
   const updateSetting = <K extends keyof CameraSettings>(key: K, value: CameraSettings[K]) => {
     if (lockedParams.includes(key)) return;
-    const newSettings = { ...cameraSettings, [key]: value };
-    setCameraSettings(newSettings);
-    updatePromptFromCamera(newSettings);
+    setCameraSettings(prev => ({ ...prev, [key]: value }));
   };
 
   // Update light setting
   const updateLight = (lightType: 'key_light' | 'fill_light' | 'rim_light', key: string, value: number) => {
     if (lockedParams.includes(`${lightType}.${key}`)) return;
-    const newSettings = {
-      ...cameraSettings,
-      [lightType]: { ...cameraSettings[lightType], [key]: value }
-    };
-    setCameraSettings(newSettings);
-    updatePromptFromCamera(newSettings);
+    setCameraSettings(prev => ({
+      ...prev,
+      [lightType]: { ...prev[lightType], [key]: value }
+    }));
   };
 
   // Toggle lock
@@ -161,75 +252,9 @@ const StudioPage = () => {
     );
   };
 
-  // Update structured prompt based on camera settings
-  const updatePromptFromCamera = (settings: CameraSettings) => {
-    const focalLengthMap: Record<string, string> = {
-      '10': 'ultra wide (10mm)',
-      '24': 'wide (24mm)',
-      '35': 'standard (35mm)',
-      '50': 'standard (50mm)',
-      '85': 'portrait (85mm)',
-      '135': 'telephoto (135mm)',
-      '200': 'telephoto (200mm)',
-    };
-    const closestFocal = Object.keys(focalLengthMap).reduce((prev, curr) => 
-      Math.abs(parseInt(curr) - settings.focal_length_mm) < Math.abs(parseInt(prev) - settings.focal_length_mm) ? curr : prev
-    );
-
-    const angleMap: Record<string, string> = {
-      'extreme_wide': 'extreme wide shot',
-      'wide': 'wide shot',
-      'medium': 'medium shot',
-      'medium_closeup': 'medium close-up',
-      'closeup': 'close-up',
-      'extreme_closeup': 'extreme close-up',
-      'macro': 'macro shot',
-      'top_down': 'top-down shot',
-      'low_angle': 'low angle shot',
-      'high_angle': 'high angle shot',
-      'dutch_angle': 'dutch angle',
-    };
-
-    const lightingMap: Record<string, string> = {
-      'hard_studio': 'hard studio lighting with sharp shadows',
-      'soft_box': 'soft box lighting with gentle gradients',
-      'natural_sunlight': 'natural sunlight',
-      'practical': 'practical lights',
-      'neon_rgb': 'neon RGB lighting',
-      'volumetric': 'volumetric fog lighting',
-    };
-
-    const depthOfField = settings.aperture <= 2 ? 'very shallow' :
-                         settings.aperture <= 4 ? 'shallow' :
-                         settings.aperture <= 8 ? 'medium' : 'deep';
-
-    // Update structured prompt with custom prompt as short description
-    setStructuredPrompt(prev => ({
-      ...prev,
-      short_description: customPrompt || prev.short_description,
-      objects: prev.objects.map((obj, i) => i === 0 ? { ...obj, description: customPrompt || obj.description } : obj),
-      photographic_characteristics: {
-        depth_of_field: `${depthOfField} (f/${settings.aperture})`,
-        camera_angle: `${angleMap[settings.shot_preset] || 'medium shot'}, tilt: ${settings.tilt_angle}°`,
-        lens_focal_length: focalLengthMap[closestFocal] || `${settings.focal_length_mm}mm`,
-        focus: settings.auto_focus ? 'auto focus on subject' : `manual focus at ${settings.focus_distance}m`,
-      },
-      lighting: {
-        conditions: lightingMap[settings.lighting_type] || 'studio lighting',
-        direction: `key light intensity: ${Math.round(settings.key_light.intensity * 100)}%`,
-        shadows: settings.key_light.softness > 0.5 ? 'soft, diffused shadows' : 'hard, defined shadows',
-      },
-    }));
-  };
-
   // Handle custom prompt change
   const handlePromptChange = (value: string) => {
     setCustomPrompt(value);
-    setStructuredPrompt(prev => ({
-      ...prev,
-      short_description: value || DEFAULT_STUDIO_PROMPT.short_description,
-      objects: prev.objects.map((obj, i) => i === 0 ? { ...obj, description: value || "Subject as described" } : obj),
-    }));
   };
 
   // Generate image

@@ -66,6 +66,11 @@ const DEFAULT_PROMPT: FiboStructuredPrompt = {
     tone_mapping: "none",
     color_grading: "none",
     mood_filter: "none",
+    color_palette: [
+      { hue: 30, saturation: 80, hex: "#cc8033", label: "Primary" },
+      { hue: 180, saturation: 60, hex: "#33cccc", label: "Secondary" },
+      { hue: 300, saturation: 70, hex: "#cc33cc", label: "Accent" }
+    ],
     tone_adjustments: {
       brightness_percent: 50,
       contrast_percent: 50,

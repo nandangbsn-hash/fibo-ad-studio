@@ -22,7 +22,7 @@ import {
   LIGHTING_TYPES,
   GeneratedImageDb
 } from "@/types/database";
-import { FiboStructuredPrompt, buildStructuredPrompt, DEFAULT_APP_CONFIG } from "@/types/fibo";
+import { FiboStructuredPrompt, createDefaultStructuredPrompt, DEFAULT_APP_CONFIG } from "@/types/fibo";
 
 const CameraDirectorPage = () => {
   const { imageId } = useParams<{ imageId: string }>();
@@ -156,16 +156,32 @@ const CameraDirectorPage = () => {
     const updatedPrompt: FiboStructuredPrompt = {
       ...structuredPrompt,
       photographic_characteristics: {
-        ...structuredPrompt.photographic_characteristics,
-        depth_of_field: `${depthOfField} (f/${settings.aperture})`,
         camera_angle: `${angleMap[settings.shot_preset] || 'medium shot'}, tilt: ${settings.tilt_angle}°, pan: ${settings.pan_angle}°, roll: ${settings.roll_angle}°`,
-        lens_focal_length: focalLengthMap[closestFocal] || `${settings.focal_length_mm}mm`,
+      },
+      focus_and_motion: {
+        ...structuredPrompt.focus_and_motion,
+        depth_of_field: `${depthOfField} (f/${settings.aperture})`,
         focus: settings.auto_focus ? 'auto focus on subject' : `manual focus at ${settings.focus_distance}m`,
       },
+      camera_and_lens: {
+        ...structuredPrompt.camera_and_lens,
+        focal_length_mm: settings.focal_length_mm,
+        aperture_f_stop: settings.aperture,
+        shot_preset: settings.shot_preset,
+      },
       lighting: {
+        ...structuredPrompt.lighting,
+        lighting_type: settings.lighting_type,
         conditions: lightingMap[settings.lighting_type] || 'studio lighting',
         direction: `key light from ${settings.key_light.position_x < 0 ? 'left' : 'right'}, intensity: ${Math.round(settings.key_light.intensity * 100)}%`,
         shadows: settings.key_light.softness > 0.5 ? 'soft, diffused shadows' : 'hard, defined shadows',
+        key_light: {
+          intensity_percent: Math.round(settings.key_light.intensity * 100),
+          softness_percent: Math.round(settings.key_light.softness * 100),
+          temperature_kelvin: settings.key_light.color_temperature,
+        },
+        fill_light: { intensity_percent: Math.round(settings.fill_light.intensity * 100) },
+        rim_light: { intensity_percent: Math.round(settings.rim_light.intensity * 100) },
       },
     };
 

@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Header from "@/components/Header";
 import JsonPanel from "@/components/JsonPanel";
+import ColorWheel, { ColorPoint } from "@/components/ColorWheel";
 import { useImageStore } from "@/hooks/useImageStore";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -51,11 +52,32 @@ const TONE_MAPPINGS = [
   { value: 'dolby_vision', label: 'Dolby Vision' },
 ];
 
+// Default color points for color wheel
+const DEFAULT_COLOR_POINTS: ColorPoint[] = [
+  { id: 'primary', hue: 30, saturation: 80, label: 'Primary' },
+  { id: 'secondary', hue: 180, saturation: 60, label: 'Secondary' },
+  { id: 'accent', hue: 300, saturation: 70, label: 'Accent' },
+];
+
+// Helper to convert HSL to hex
+const hslToHex = (h: number, s: number, l: number): string => {
+  s /= 100;
+  l /= 100;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n: number) => {
+    const k = (n + h / 30) % 12;
+    const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+    return Math.round(255 * color).toString(16).padStart(2, '0');
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
+};
+
 // Build complete structured prompt from all settings
 const buildCompleteStructuredPrompt = (
   customPrompt: string,
   cameraSettings: CameraSettings,
-  visualSettings: VisualSettings
+  visualSettings: VisualSettings,
+  colorPoints?: ColorPoint[]
 ): FiboStructuredPrompt => {
   const cameraBodyMap: Record<string, string> = {
     'cinema': 'cinema_arri_red',
@@ -173,6 +195,12 @@ const buildCompleteStructuredPrompt = (
       tone_mapping: visualSettings.tone_mapping,
       color_grading: visualSettings.color_grading_preset,
       mood_filter: visualSettings.mood_filter,
+      color_palette: colorPoints?.map(p => ({
+        hue: Math.round(p.hue),
+        saturation: Math.round(p.saturation),
+        hex: hslToHex(p.hue, p.saturation, 50),
+        label: p.label
+      })),
       tone_adjustments: {
         brightness_percent: visualSettings.brightness,
         contrast_percent: visualSettings.contrast,
@@ -212,16 +240,17 @@ const StudioPage = () => {
   const [cameraSettings, setCameraSettings] = useState<CameraSettings>(DEFAULT_CAMERA_SETTINGS);
   const [visualSettings, setVisualSettings] = useState<VisualSettings>(DEFAULT_VISUAL_SETTINGS);
   const [structuredPrompt, setStructuredPrompt] = useState<FiboStructuredPrompt>(() => 
-    buildCompleteStructuredPrompt("", DEFAULT_CAMERA_SETTINGS, DEFAULT_VISUAL_SETTINGS)
+    buildCompleteStructuredPrompt("", DEFAULT_CAMERA_SETTINGS, DEFAULT_VISUAL_SETTINGS, DEFAULT_COLOR_POINTS)
   );
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [lockedParams, setLockedParams] = useState<string[]>([]);
+  const [colorPoints, setColorPoints] = useState<ColorPoint[]>(DEFAULT_COLOR_POINTS);
 
   // Rebuild structured prompt whenever settings change
   useEffect(() => {
-    setStructuredPrompt(buildCompleteStructuredPrompt(customPrompt, cameraSettings, visualSettings));
-  }, [customPrompt, cameraSettings, visualSettings]);
+    setStructuredPrompt(buildCompleteStructuredPrompt(customPrompt, cameraSettings, visualSettings, colorPoints));
+  }, [customPrompt, cameraSettings, visualSettings, colorPoints]);
 
   // Update a visual setting
   const updateVisualSetting = <K extends keyof VisualSettings>(key: K, value: VisualSettings[K]) => {
@@ -676,6 +705,17 @@ const StudioPage = () => {
                       {COLOR_SPACES.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                </div>
+
+                {/* Color Wheel */}
+                <div className="p-3 bg-muted/20 rounded-lg border border-border/30">
+                  <ColorWheel
+                    colorPoints={colorPoints}
+                    onChange={setColorPoints}
+                    bitDepth={visualSettings.color_bit_depth}
+                    hdrEnabled={visualSettings.hdr_enabled}
+                    size={180}
+                  />
                 </div>
 
                 {/* Tone Mapping */}

@@ -88,6 +88,14 @@ export interface FiboLuminanceControls {
   blacks_percent: number;
 }
 
+// Color palette point
+export interface FiboColorPoint {
+  hue: number;
+  saturation: number;
+  hex: string;
+  label: string;
+}
+
 // Visual and color settings
 export interface FiboVisualAndColor {
   hdr_enabled: boolean;
@@ -96,6 +104,7 @@ export interface FiboVisualAndColor {
   tone_mapping: string;
   color_grading: string;
   mood_filter: string;
+  color_palette?: FiboColorPoint[];
   tone_adjustments: FiboToneAdjustments;
   luminance_controls: FiboLuminanceControls;
 }

@@ -77,18 +77,89 @@ serve(async (req) => {
           parts.push(`Background: ${sp.background_setting}`);
         }
         
-        if (sp.lighting) {
-          const lighting = sp.lighting;
-          if (lighting.conditions) parts.push(`Lighting: ${lighting.conditions}`);
+        // === CAMERA & LENS ===
+        if (sp.camera_and_lens) {
+          const cam = sp.camera_and_lens;
+          const camDesc: string[] = [];
+          if (cam.camera_body) camDesc.push(`shot on ${cam.camera_body.replace(/_/g, ' ')}`);
+          if (cam.lens_type) camDesc.push(`${cam.lens_type.replace(/_/g, ' ')} lens`);
+          if (cam.focal_length_mm) camDesc.push(`${cam.focal_length_mm}mm focal length`);
+          if (cam.aperture_f_stop) camDesc.push(`f/${cam.aperture_f_stop} aperture`);
+          if (cam.shot_preset) camDesc.push(`${cam.shot_preset.replace(/_/g, ' ')} shot`);
+          if (camDesc.length > 0) parts.push(`Camera: ${camDesc.join(', ')}`);
         }
         
+        // === GEOMETRY (Camera angles/position) ===
+        if (sp.geometry) {
+          const geo = sp.geometry;
+          const geoDesc: string[] = [];
+          if (geo.tilt_degrees && geo.tilt_degrees !== 0) geoDesc.push(`${geo.tilt_degrees}° tilt`);
+          if (geo.pan_degrees && geo.pan_degrees !== 0) geoDesc.push(`${geo.pan_degrees}° pan`);
+          if (geo.roll_degrees && geo.roll_degrees !== 0) geoDesc.push(`${geo.roll_degrees}° roll (dutch angle)`);
+          if (geo.distance_meters) geoDesc.push(`${geo.distance_meters}m camera distance`);
+          if (geoDesc.length > 0) parts.push(`Camera position: ${geoDesc.join(', ')}`);
+        }
+        
+        // === LIGHTING (Full details) ===
+        if (sp.lighting) {
+          const light = sp.lighting;
+          const lightDesc: string[] = [];
+          if (light.lighting_type) lightDesc.push(light.lighting_type.replace(/_/g, ' '));
+          if (light.conditions) lightDesc.push(light.conditions);
+          if (light.key_light) {
+            if (light.key_light.intensity_percent !== undefined) {
+              lightDesc.push(`key light at ${light.key_light.intensity_percent}% intensity`);
+            }
+            if (light.key_light.softness_percent !== undefined) {
+              lightDesc.push(`${light.key_light.softness_percent}% softness`);
+            }
+            if (light.key_light.temperature_kelvin) {
+              lightDesc.push(`${light.key_light.temperature_kelvin}K color temperature`);
+            }
+          }
+          if (light.fill_light?.intensity_percent !== undefined) {
+            lightDesc.push(`fill light at ${light.fill_light.intensity_percent}%`);
+          }
+          if (light.rim_light?.intensity_percent !== undefined) {
+            lightDesc.push(`rim light at ${light.rim_light.intensity_percent}%`);
+          }
+          if (lightDesc.length > 0) parts.push(`Lighting: ${lightDesc.join(', ')}`);
+        }
+        
+        // === FOCUS & MOTION ===
+        if (sp.focus_and_motion) {
+          const fm = sp.focus_and_motion;
+          const fmDesc: string[] = [];
+          if (fm.depth_of_field) fmDesc.push(`${fm.depth_of_field.replace(/_/g, ' ')} depth of field`);
+          if (fm.focus_distance_meters) fmDesc.push(`focus at ${fm.focus_distance_meters}m`);
+          if (fm.shutter_speed) fmDesc.push(`${fm.shutter_speed} shutter speed`);
+          if (fm.shutter_angle_degrees) fmDesc.push(`${fm.shutter_angle_degrees}° shutter angle`);
+          if (fm.motion_blur_amount) fmDesc.push(`${fm.motion_blur_amount.replace(/_/g, ' ')} motion blur`);
+          if (fmDesc.length > 0) parts.push(`Focus: ${fmDesc.join(', ')}`);
+        }
+        
+        // === SENSOR & EXPOSURE ===
+        if (sp.sensor_and_exposure) {
+          const se = sp.sensor_and_exposure;
+          const seDesc: string[] = [];
+          if (se.sensor_size) seDesc.push(`${se.sensor_size.replace(/_/g, ' ')} sensor`);
+          if (se.iso) seDesc.push(`ISO ${se.iso}`);
+          if (se.exposure_compensation_ev && se.exposure_compensation_ev !== 0) {
+            seDesc.push(`${se.exposure_compensation_ev > 0 ? '+' : ''}${se.exposure_compensation_ev} EV exposure compensation`);
+          }
+          if (se.white_balance_kelvin) seDesc.push(`${se.white_balance_kelvin}K white balance`);
+          if (se.dynamic_range) seDesc.push(`${se.dynamic_range.replace(/_/g, ' ')} dynamic range`);
+          if (seDesc.length > 0) parts.push(`Exposure: ${seDesc.join(', ')}`);
+        }
+        
+        // === AESTHETICS ===
         if (sp.aesthetics) {
           const a = sp.aesthetics;
           if (a.mood_atmosphere) parts.push(`Mood: ${a.mood_atmosphere}`);
           if (a.color_scheme) parts.push(`Colors: ${a.color_scheme}`);
         }
         
-        // Include color palette from visual_and_color
+        // === VISUAL & COLOR (Full details) ===
         if (sp.visual_and_color) {
           const vc = sp.visual_and_color;
           
@@ -111,6 +182,26 @@ serve(async (req) => {
             parts.push(`${vc.color_bit_depth} color depth for ${vc.color_bit_depth === '16-bit' ? 'maximum' : vc.color_bit_depth === '12-bit' ? 'high' : 'standard'} color richness`);
           }
           
+          // Add color space
+          if (vc.color_space) {
+            parts.push(`${vc.color_space} color space`);
+          }
+          
+          // Add color grading
+          if (vc.color_grading && vc.color_grading !== 'none') {
+            parts.push(`${vc.color_grading.replace(/_/g, ' ')} color grading`);
+          }
+          
+          // Add mood filter
+          if (vc.mood_filter && vc.mood_filter !== 'none') {
+            parts.push(`${vc.mood_filter.replace(/_/g, ' ')} mood filter`);
+          }
+          
+          // Add tone mapping
+          if (vc.tone_mapping && vc.tone_mapping !== 'none') {
+            parts.push(`${vc.tone_mapping.replace(/_/g, ' ')} tone mapping`);
+          }
+          
           // Add tone adjustments
           if (vc.tone_adjustments) {
             const ta = vc.tone_adjustments;
@@ -118,14 +209,40 @@ serve(async (req) => {
             if (ta.brightness && ta.brightness !== 0) toneDesc.push(`brightness ${ta.brightness > 0 ? 'increased' : 'decreased'}`);
             if (ta.contrast && ta.contrast !== 0) toneDesc.push(`${ta.contrast > 0 ? 'high' : 'low'} contrast`);
             if (ta.saturation && ta.saturation !== 0) toneDesc.push(`${ta.saturation > 0 ? 'vibrant' : 'muted'} saturation`);
+            if (ta.vibrance && ta.vibrance !== 0) toneDesc.push(`${ta.vibrance > 0 ? 'enhanced' : 'reduced'} vibrance`);
+            if (ta.clarity && ta.clarity !== 0) toneDesc.push(`${ta.clarity > 0 ? 'enhanced' : 'reduced'} clarity`);
             if (toneDesc.length > 0) parts.push(`Tone: ${toneDesc.join(', ')}`);
+          }
+          
+          // Add luminance controls
+          if (vc.luminance_controls) {
+            const lc = vc.luminance_controls;
+            const lcDesc: string[] = [];
+            if (lc.highlights_percent !== undefined && lc.highlights_percent !== 50) {
+              lcDesc.push(`${lc.highlights_percent > 50 ? 'boosted' : 'reduced'} highlights`);
+            }
+            if (lc.shadows_percent !== undefined && lc.shadows_percent !== 50) {
+              lcDesc.push(`${lc.shadows_percent > 50 ? 'lifted' : 'crushed'} shadows`);
+            }
+            if (lc.whites_percent !== undefined && lc.whites_percent !== 50) {
+              lcDesc.push(`${lc.whites_percent > 50 ? 'bright' : 'subdued'} whites`);
+            }
+            if (lc.blacks_percent !== undefined && lc.blacks_percent !== 50) {
+              lcDesc.push(`${lc.blacks_percent > 50 ? 'lifted' : 'deep'} blacks`);
+            }
+            if (lcDesc.length > 0) parts.push(`Luminance: ${lcDesc.join(', ')}`);
           }
         }
         
+        // === PHOTOGRAPHIC CHARACTERISTICS ===
         if (sp.photographic_characteristics) {
           const p = sp.photographic_characteristics;
-          if (p.camera_angle) parts.push(`Camera: ${p.camera_angle}`);
-          if (p.depth_of_field) parts.push(`DOF: ${p.depth_of_field}`);
+          const photoDesc: string[] = [];
+          if (p.camera_angle) photoDesc.push(`${p.camera_angle.replace(/_/g, ' ')} angle`);
+          if (p.depth_of_field) photoDesc.push(`${p.depth_of_field.replace(/_/g, ' ')} DOF`);
+          if (p.focus) photoDesc.push(`${p.focus.replace(/_/g, ' ')} focus`);
+          if (p.lens_focal_length) photoDesc.push(`${p.lens_focal_length}`);
+          if (photoDesc.length > 0) parts.push(`Photo: ${photoDesc.join(', ')}`);
         }
         
         if (sp.style_medium) {

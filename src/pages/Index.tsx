@@ -47,16 +47,85 @@ const Index = () => {
     setAspectRatio(ratio);
   };
 
-  // When app config changes, always rebuild the structured prompt
+  // When app config changes, build a complete structured prompt with all settings
   const handleConfigChange = (newConfig: AppConfig) => {
     setAppConfig(newConfig);
     setAspectRatio(newConfig.aspect_ratio);
     
-    // Update structured prompt with new description
-    const updatedPrompt = createDefaultStructuredPrompt(
-      newConfig.subject_description || 'Premium product',
-      brandAnalysis?.category || 'Premium Brand'
-    );
+    // Build complete structured prompt from AppConfig (use buildStructuredPrompt for full mapping)
+    const updatedPrompt: FiboStructuredPrompt = {
+      short_description: `A ${newConfig.style.artistic_style} ${newConfig.style.medium} of ${newConfig.subject_description || 'Premium product'} for ${brandAnalysis?.category || 'Premium Brand'}. The scene has a ${newConfig.composition.mood} atmosphere with ${newConfig.lighting.conditions} lighting.`,
+      objects: structuredPrompt?.objects || [
+        {
+          description: newConfig.subject_description || 'Premium product',
+          location: 'center',
+          relative_size: 'large within frame',
+          shape_and_color: 'As described by the product',
+          texture: 'Realistic, detailed surface',
+          appearance_details: `High-quality product photography style, ${newConfig.style.artistic_style}`,
+        }
+      ],
+      background_setting: newConfig.composition.background,
+      camera_and_lens: {
+        camera_body: 'cinema_arri_red',
+        lens_type: 'prime',
+        focal_length_mm: parseInt(newConfig.camera.focal_length.match(/\d+/)?.[0] || '85'),
+        aperture_f_stop: newConfig.camera.depth_of_field === 'shallow' ? 2.8 : newConfig.camera.depth_of_field === 'medium' ? 5.6 : 11,
+        shot_preset: newConfig.camera.shot_type === 'close-up' ? 'closeup' : newConfig.camera.shot_type === 'wide-shot' ? 'wide' : 'medium'
+      },
+      geometry: {
+        tilt_degrees: newConfig.camera.angle === 'high-angle' ? -30 : newConfig.camera.angle === 'low-angle' ? 30 : 0,
+        pan_degrees: 0,
+        roll_degrees: newConfig.camera.angle === 'dutch-angle' ? 15 : 0,
+        distance_meters: 3
+      },
+      lighting: {
+        lighting_type: 'soft_box',
+        key_light: { intensity_percent: 100, softness_percent: 50, temperature_kelvin: 5600 },
+        fill_light: { intensity_percent: 50 },
+        rim_light: { intensity_percent: 70 },
+        conditions: newConfig.lighting.conditions,
+        direction: newConfig.lighting.direction,
+        shadows: newConfig.lighting.intensity === 'soft' ? 'soft, diffused shadows' : 'hard, defined shadows'
+      },
+      focus_and_motion: {
+        focus_distance_meters: 3,
+        shutter_angle_degrees: 180,
+        shutter_speed: '1/50s',
+        depth_of_field: newConfig.camera.depth_of_field,
+        focus: 'sharp focus on subject'
+      },
+      sensor_and_exposure: structuredPrompt?.sensor_and_exposure || {
+        iso: 400,
+        exposure_compensation_ev: 0,
+        white_balance_kelvin: 5600,
+        dynamic_range_percent: 80
+      },
+      visual_and_color: structuredPrompt?.visual_and_color || {
+        hdr_enabled: false,
+        color_bit_depth: '8-bit',
+        color_space: 'sRGB',
+        tone_mapping: 'none',
+        color_grading: 'none',
+        mood_filter: 'none',
+        tone_adjustments: { brightness_percent: 50, contrast_percent: 50, saturation_percent: 50, vibrance_percent: 50, clarity_percent: 50 },
+        luminance_controls: { highlights_percent: 50, shadows_percent: 50, whites_percent: 50, blacks_percent: 50 }
+      },
+      aesthetics: {
+        composition: `${newConfig.composition.layout} composition`,
+        color_scheme: newConfig.style.color_scheme,
+        mood_atmosphere: newConfig.composition.mood,
+        preference_score: 'very high',
+        aesthetic_score: 'very high'
+      },
+      photographic_characteristics: {
+        camera_angle: newConfig.camera.angle
+      },
+      style_medium: newConfig.style.medium,
+      context: `Professional advertising image for ${brandAnalysis?.category || 'Premium Brand'}, targeting premium quality and brand aesthetics.`,
+      artistic_style: newConfig.style.artistic_style
+    };
+    
     setStructuredPrompt(updatedPrompt);
   };
 

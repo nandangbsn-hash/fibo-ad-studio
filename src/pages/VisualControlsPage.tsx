@@ -75,7 +75,7 @@ const VisualControlsPage = () => {
     updatePromptFromVisuals({ ...visualSettings, [key]: value });
   };
 
-  // Update structured prompt based on visual settings
+  // Update structured prompt based on visual settings (full mapping to FIBO)
   const updatePromptFromVisuals = (settings: VisualSettings) => {
     if (!structuredPrompt) return;
 
@@ -105,7 +105,24 @@ const VisualControlsPage = () => {
         color_scheme: `${settings.color_palette}${gradingMap[settings.color_grading_preset] || ''}`,
         mood_atmosphere: moodMap[settings.mood_filter] || structuredPrompt.aesthetics.mood_atmosphere,
       },
-      short_description: `${structuredPrompt.short_description}${settings.hdr_enabled ? ' HDR enabled with high dynamic range.' : ''}`,
+      // Full visual_and_color mapping
+      visual_and_color: {
+        ...structuredPrompt.visual_and_color,
+        hdr_enabled: settings.hdr_enabled,
+        color_bit_depth: settings.hdr_enabled ? '10-bit' : '8-bit',
+        color_space: settings.hdr_enabled ? 'Rec.2020' : 'sRGB',
+        color_grading: settings.color_grading_preset,
+        mood_filter: settings.mood_filter,
+        tone_adjustments: {
+          brightness_percent: settings.brightness,
+          contrast_percent: settings.contrast,
+          saturation_percent: settings.saturation,
+          vibrance_percent: structuredPrompt.visual_and_color.tone_adjustments.vibrance_percent,
+          clarity_percent: structuredPrompt.visual_and_color.tone_adjustments.clarity_percent,
+        },
+        luminance_controls: structuredPrompt.visual_and_color.luminance_controls,
+      },
+      short_description: `${structuredPrompt.short_description.replace(/ HDR enabled with high dynamic range\./g, '')}${settings.hdr_enabled ? ' HDR enabled with high dynamic range.' : ''}`,
     };
 
     setStructuredPrompt(updatedPrompt);

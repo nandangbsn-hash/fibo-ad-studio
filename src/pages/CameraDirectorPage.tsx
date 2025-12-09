@@ -105,7 +105,7 @@ const CameraDirectorPage = () => {
     }));
   };
 
-  // Update structured prompt based on camera settings
+  // Update structured prompt based on camera settings (full mapping including sensor/exposure)
   const updatePromptFromCamera = (settings: CameraSettings) => {
     if (!structuredPrompt) return;
     
@@ -131,13 +131,13 @@ const CameraDirectorPage = () => {
       'closeup': 'close-up',
       'extreme_closeup': 'extreme close-up',
       'macro': 'macro shot',
-      'over_shoulder': 'over-the-shoulder shot',
-      'pov': 'POV shot',
-      'top_down': 'top-down shot',
-      'low_angle': 'low angle shot',
-      'high_angle': 'high angle shot',
-      'dutch_angle': 'dutch angle',
-      'isometric': 'isometric view',
+      'over_shoulder': 'over-the-shoulder composition with subject partially visible from behind',
+      'pov': 'POV shot from first-person perspective',
+      'top_down': 'top-down overhead shot looking straight down',
+      'low_angle': 'low angle shot looking upward',
+      'high_angle': 'high angle shot looking downward',
+      'dutch_angle': 'dutch angle with tilted horizon',
+      'isometric': 'isometric 3D view',
     };
 
     const lightingMap: Record<string, string> = {
@@ -162,12 +162,22 @@ const CameraDirectorPage = () => {
         ...structuredPrompt.focus_and_motion,
         depth_of_field: `${depthOfField} (f/${settings.aperture})`,
         focus: settings.auto_focus ? 'auto focus on subject' : `manual focus at ${settings.focus_distance}m`,
+        shutter_angle_degrees: settings.shutter_angle,
+        shutter_speed: `1/${settings.shutter_speed}s`,
       },
       camera_and_lens: {
         ...structuredPrompt.camera_and_lens,
+        camera_body: settings.camera_body,
+        lens_type: settings.lens_type,
         focal_length_mm: settings.focal_length_mm,
         aperture_f_stop: settings.aperture,
         shot_preset: settings.shot_preset,
+      },
+      geometry: {
+        tilt_degrees: settings.tilt_angle,
+        pan_degrees: settings.pan_angle,
+        roll_degrees: settings.roll_angle,
+        distance_meters: settings.camera_distance,
       },
       lighting: {
         ...structuredPrompt.lighting,
@@ -182,6 +192,13 @@ const CameraDirectorPage = () => {
         },
         fill_light: { intensity_percent: Math.round(settings.fill_light.intensity * 100) },
         rim_light: { intensity_percent: Math.round(settings.rim_light.intensity * 100) },
+      },
+      // Full sensor_and_exposure mapping
+      sensor_and_exposure: {
+        iso: settings.iso,
+        exposure_compensation_ev: settings.exposure_compensation,
+        white_balance_kelvin: settings.white_balance,
+        dynamic_range_percent: settings.dynamic_range,
       },
     };
 

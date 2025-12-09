@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import { Camera, Sun, Focus, Gauge, Lock, Unlock, Loader2, Sparkles, ImagePlus, Palette, Zap } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Camera, Sun, Focus, Gauge, Lock, Unlock, Loader2, Sparkles, ImagePlus, Palette, Zap, AlertTriangle, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
@@ -51,6 +51,41 @@ const TONE_MAPPINGS = [
   { value: 'hdr10', label: 'HDR10' },
   { value: 'dolby_vision', label: 'Dolby Vision' },
 ];
+
+// Photography presets for common scenarios
+const PHOTOGRAPHY_PRESETS = [
+  { 
+    value: 'studio_portrait', 
+    label: 'Studio Portrait',
+    settings: { iso: 200, shutter_speed: 200, shutter_angle: 180, aperture: 2.8, lighting_type: 'soft_box' }
+  },
+  { 
+    value: 'product_shot', 
+    label: 'Product Shot',
+    settings: { iso: 100, shutter_speed: 125, shutter_angle: 180, aperture: 8, lighting_type: 'soft_box' }
+  },
+  { 
+    value: 'daylight_natural', 
+    label: 'Daylight Natural',
+    settings: { iso: 400, shutter_speed: 500, shutter_angle: 180, aperture: 5.6, lighting_type: 'natural_sunlight' }
+  },
+  { 
+    value: 'low_light', 
+    label: 'Low Light',
+    settings: { iso: 1600, shutter_speed: 60, shutter_angle: 180, aperture: 1.8, lighting_type: 'practical' }
+  },
+  { 
+    value: 'action_sports', 
+    label: 'Action/Sports',
+    settings: { iso: 800, shutter_speed: 1000, shutter_angle: 180, aperture: 4, lighting_type: 'natural_sunlight' }
+  },
+];
+
+// Standard ISO stops for realistic camera behavior
+const ISO_STOPS = [100, 200, 400, 800, 1600, 3200, 6400];
+
+// Standard shutter angle presets
+const SHUTTER_ANGLE_PRESETS = [45, 90, 144, 172.8, 180, 270, 360];
 
 // Default color points for color wheel
 const DEFAULT_COLOR_POINTS: ColorPoint[] = [
@@ -246,6 +281,50 @@ const StudioPage = () => {
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [lockedParams, setLockedParams] = useState<string[]>([]);
   const [colorPoints, setColorPoints] = useState<ColorPoint[]>(DEFAULT_COLOR_POINTS);
+  const [selectedPreset, setSelectedPreset] = useState<string>('');
+
+  // Calculate validation warnings for unrealistic settings
+  const validationWarnings = useMemo(() => {
+    const warnings: { field: string; message: string }[] = [];
+    
+    // High ISO warning
+    if (cameraSettings.iso >= 3200) {
+      warnings.push({ field: 'iso', message: 'High ISO may introduce visible noise' });
+    }
+    
+    // Fast shutter speed warning for non-action scenarios
+    if (cameraSettings.shutter_speed >= 1000 && cameraSettings.lighting_type !== 'natural_sunlight') {
+      warnings.push({ field: 'shutter_speed', message: 'Fast shutter unusual for static studio subjects' });
+    }
+    
+    // Non-standard shutter angle warning
+    if (cameraSettings.shutter_angle !== 180) {
+      warnings.push({ field: 'shutter_angle', message: 'Non-180° shutter creates non-standard motion blur' });
+    }
+    
+    // High ISO with studio lighting mismatch
+    if (cameraSettings.iso >= 1600 && cameraSettings.lighting_type === 'soft_box') {
+      warnings.push({ field: 'iso_lighting', message: 'High ISO unusual with softbox studio lighting' });
+    }
+
+    return warnings;
+  }, [cameraSettings.iso, cameraSettings.shutter_speed, cameraSettings.shutter_angle, cameraSettings.lighting_type]);
+
+  // Apply a photography preset
+  const applyPreset = (presetValue: string) => {
+    const preset = PHOTOGRAPHY_PRESETS.find(p => p.value === presetValue);
+    if (preset) {
+      setCameraSettings(prev => ({
+        ...prev,
+        iso: preset.settings.iso,
+        shutter_speed: preset.settings.shutter_speed,
+        shutter_angle: preset.settings.shutter_angle,
+        aperture: preset.settings.aperture,
+        lighting_type: preset.settings.lighting_type,
+      }));
+      setSelectedPreset(presetValue);
+    }
+  };
 
   // Rebuild structured prompt whenever settings change
   useEffect(() => {
@@ -396,6 +475,20 @@ const StudioPage = () => {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="flex-1">
+                  <Label className="text-xs text-muted-foreground mb-2 block">Quick Preset</Label>
+                  <Select value={selectedPreset} onValueChange={applyPreset}>
+                    <SelectTrigger className="bg-muted/50">
+                      <Wand2 className="w-4 h-4 mr-2" />
+                      <SelectValue placeholder="Select preset..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PHOTOGRAPHY_PRESETS.map(preset => (
+                        <SelectItem key={preset.value} value={preset.value}>{preset.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <Button 
                   onClick={handleGenerate}
                   disabled={isGenerating || !customPrompt.trim()}
@@ -409,6 +502,31 @@ const StudioPage = () => {
                   Generate
                 </Button>
               </div>
+
+              {/* Validation Warnings */}
+              <AnimatePresence>
+                {validationWarnings.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="space-y-2"
+                  >
+                    {validationWarnings.map((warning, idx) => (
+                      <motion.div
+                        key={warning.field}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: idx * 0.05 }}
+                        className="flex items-center gap-2 p-2 bg-warning/10 border border-warning/30 rounded-md text-xs"
+                      >
+                        <AlertTriangle className="w-3.5 h-3.5 text-warning shrink-0" />
+                        <span className="text-warning">{warning.message}</span>
+                      </motion.div>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.div>
 
             {/* Camera Controls Tabs */}
@@ -604,21 +722,49 @@ const StudioPage = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-xs">Shutter Angle: {cameraSettings.shutter_angle}°</Label>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs">
+                      Shutter Angle: {cameraSettings.shutter_angle}°
+                      {cameraSettings.shutter_angle === 180 && <span className="text-primary ml-1">(cinema standard)</span>}
+                    </Label>
+                  </div>
                   <Slider
                     value={[cameraSettings.shutter_angle]}
                     onValueChange={([v]) => updateSetting('shutter_angle', v)}
-                    min={1} max={360} step={1}
+                    min={45} max={360} step={1}
                   />
+                  <div className="flex gap-1 flex-wrap">
+                    {SHUTTER_ANGLE_PRESETS.map(angle => (
+                      <Button
+                        key={angle}
+                        size="sm"
+                        variant={cameraSettings.shutter_angle === angle ? 'default' : 'outline'}
+                        onClick={() => updateSetting('shutter_angle', angle)}
+                        className="text-xs h-6 px-2"
+                      >
+                        {angle}°
+                      </Button>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-xs">Shutter Speed: 1/{cameraSettings.shutter_speed}s</Label>
+                  <Label className="text-xs">
+                    Shutter Speed: 1/{cameraSettings.shutter_speed}s
+                    {cameraSettings.shutter_speed >= 1000 && (
+                      <span className="text-warning ml-1">(fast)</span>
+                    )}
+                  </Label>
                   <Slider
                     value={[cameraSettings.shutter_speed]}
                     onValueChange={([v]) => updateSetting('shutter_speed', v)}
-                    min={1} max={4000} step={1}
+                    min={15} max={4000} step={1}
                   />
+                  <div className="flex justify-between text-[10px] text-muted-foreground px-1">
+                    <span>1/15s (slow)</span>
+                    <span>1/250s (portraits)</span>
+                    <span>1/4000s (action)</span>
+                  </div>
                 </div>
               </TabsContent>
 
@@ -630,12 +776,29 @@ const StudioPage = () => {
                 </h3>
 
                 <div className="space-y-2">
-                  <Label className="text-xs">ISO: {cameraSettings.iso}</Label>
+                  <Label className="text-xs">
+                    ISO: {cameraSettings.iso}
+                    {cameraSettings.iso >= 3200 && <span className="text-warning ml-1">(high noise)</span>}
+                    {cameraSettings.iso <= 400 && <span className="text-primary ml-1">(clean)</span>}
+                  </Label>
                   <Slider
                     value={[cameraSettings.iso]}
                     onValueChange={([v]) => updateSetting('iso', v)}
-                    min={50} max={12800} step={50}
+                    min={100} max={6400} step={100}
                   />
+                  <div className="flex gap-1 flex-wrap">
+                    {ISO_STOPS.map(iso => (
+                      <Button
+                        key={iso}
+                        size="sm"
+                        variant={cameraSettings.iso === iso ? 'default' : 'outline'}
+                        onClick={() => updateSetting('iso', iso)}
+                        className="text-xs h-6 px-2"
+                      >
+                        {iso}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="space-y-2">

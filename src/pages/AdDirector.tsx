@@ -34,14 +34,17 @@ const AdDirector = () => {
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [currentCampaignId, setCurrentCampaignId] = useState<string | null>(null);
+  const [productImageUrl, setProductImageUrl] = useState<string | null>(null);
 
   const handleAnalysisComplete = async (
     analysis: BrandAnalysis, 
     newConcepts: AdConcept[], 
-    productDescription: string
+    productDescription: string,
+    productImage?: string
   ) => {
     setBrandAnalysis(analysis);
     setConcepts(newConcepts);
+    setProductImageUrl(productImage || null);
     
     // Update app config with subject description from brand intake
     setAppConfig(prev => ({ ...prev, subject_description: productDescription }));
@@ -54,6 +57,7 @@ const AdDirector = () => {
       tone: analysis.tone,
       key_values: analysis.key_values,
       recommended_palette: analysis.recommended_palette,
+      product_image_url: productImage || null,
     });
 
     if (campaign) {
@@ -169,6 +173,7 @@ const AdDirector = () => {
               aspectRatio={aspectRatio}
               generatedImages={generatedImages}
               setGeneratedImages={handleImagesGenerated}
+              productImageUrl={productImageUrl}
             />
           </div>
 

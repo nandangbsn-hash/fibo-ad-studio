@@ -71,6 +71,7 @@ export type Database = {
           key_values: string[] | null
           mood: string | null
           product_description: string | null
+          product_image_url: string | null
           recommended_palette: string | null
           target_audience: string | null
           tone: string | null
@@ -86,6 +87,7 @@ export type Database = {
           key_values?: string[] | null
           mood?: string | null
           product_description?: string | null
+          product_image_url?: string | null
           recommended_palette?: string | null
           target_audience?: string | null
           tone?: string | null
@@ -101,6 +103,7 @@ export type Database = {
           key_values?: string[] | null
           mood?: string | null
           product_description?: string | null
+          product_image_url?: string | null
           recommended_palette?: string | null
           target_audience?: string | null
           tone?: string | null

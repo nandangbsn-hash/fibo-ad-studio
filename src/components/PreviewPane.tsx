@@ -1,21 +1,25 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ImageIcon, Sparkles, Loader2, Download, ExternalLink, Zap } from "lucide-react";
+import { ImageIcon, Sparkles, Loader2, Download, ExternalLink, Zap, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FiboStructuredPrompt, GeneratedImage } from "@/types/fibo";
 import { useToast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
 
 interface PreviewPaneProps {
   structuredPrompt: FiboStructuredPrompt | null;
   aspectRatio: string;
   generatedImages: GeneratedImage[];
   setGeneratedImages: (images: GeneratedImage[]) => void;
+  productImageUrl?: string | null;
 }
 
-const PreviewPane = ({ structuredPrompt, aspectRatio, generatedImages, setGeneratedImages }: PreviewPaneProps) => {
+const PreviewPane = ({ structuredPrompt, aspectRatio, generatedImages, setGeneratedImages, productImageUrl }: PreviewPaneProps) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const { toast } = useToast();
+
+  const hasProductImage = !!productImageUrl;
 
   const handleGenerate = async () => {
     if (!structuredPrompt) {
@@ -30,33 +34,61 @@ const PreviewPane = ({ structuredPrompt, aspectRatio, generatedImages, setGenera
     setIsGenerating(true);
     
     try {
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-fibo`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: JSON.stringify({ 
-          structured_prompt: structuredPrompt,
-          aspect_ratio: aspectRatio,
-          sync: true
-        }),
-      });
+      let response;
+      
+      if (hasProductImage) {
+        // Use Product Shot API when product image is available
+        const sceneDescription = structuredPrompt.short_description || 
+          `${structuredPrompt.background_setting}, ${structuredPrompt.lighting?.conditions || 'studio lighting'}`;
+        
+        response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-product-shot`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ 
+            productImageUrl: productImageUrl,
+            sceneDescription: sceneDescription,
+            aspectRatio: aspectRatio,
+            placementType: 'automatic',
+            optimizeDescription: true
+          }),
+        });
+      } else {
+        // Use standard FIBO generation
+        response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-fibo`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ 
+            structured_prompt: structuredPrompt,
+            aspect_ratio: aspectRatio,
+            sync: true
+          }),
+        });
+      }
 
       const data = await response.json();
       
-      if (data.success && data.image_url) {
+      // Handle both response formats
+      const imageUrl = data.image_url || data.images?.[0]?.url;
+      const seed = data.seed || data.images?.[0]?.seed;
+      
+      if (data.success && imageUrl) {
         const newImage: GeneratedImage = {
-          url: data.image_url,
+          url: imageUrl,
           id: data.request_id || `gen-${Date.now()}`,
-          seed: data.seed,
-          structured_prompt: data.structured_prompt
+          seed: seed,
+          structured_prompt: data.structured_prompt || structuredPrompt
         };
         setGeneratedImages([newImage, ...generatedImages]);
         setSelectedImage(newImage.url);
         toast({
-          title: "Image Generated!",
-          description: `Seed: ${data.seed}`,
+          title: hasProductImage ? "Product Shot Generated!" : "Image Generated!",
+          description: seed ? `Seed: ${seed}` : "Ready to use",
         });
       } else {
         throw new Error(data.error || 'Generation failed');
@@ -88,7 +120,17 @@ const PreviewPane = ({ structuredPrompt, aspectRatio, generatedImages, setGenera
           </div>
           <div>
             <h2 className="text-lg font-semibold">Preview</h2>
-            <p className="text-sm text-muted-foreground">Bria FIBO generation</p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm text-muted-foreground">
+                {hasProductImage ? 'Product Shot generation' : 'Bria FIBO generation'}
+              </p>
+              {hasProductImage && (
+                <Badge variant="secondary" className="text-xs">
+                  <Package className="w-3 h-3 mr-1" />
+                  Product Mode
+                </Badge>
+              )}
+            </div>
           </div>
         </div>
 
@@ -105,7 +147,7 @@ const PreviewPane = ({ structuredPrompt, aspectRatio, generatedImages, setGenera
           ) : (
             <>
               <Zap className="w-4 h-4 mr-2" />
-              Generate with FIBO
+              {hasProductImage ? 'Generate Product Shot' : 'Generate with FIBO'}
             </>
           )}
         </Button>

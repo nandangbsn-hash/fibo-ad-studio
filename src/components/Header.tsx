@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Sparkles, Film, Camera, LogOut, User } from "lucide-react";
+import { Sparkles, Film, Camera, LogOut, User, Globe } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ const Header = () => {
     { path: "/", label: "Ad Director", icon: Sparkles },
     { path: "/studio", label: "Studio", icon: Camera },
     { path: "/feed", label: "Feed", icon: Film },
+    { path: "/explore", label: "Explore", icon: Globe },
   ];
 
   const handleSignOut = async () => {

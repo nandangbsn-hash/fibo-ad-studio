@@ -5,25 +5,25 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const LOVABLE_API_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const BRIA_API_KEY = Deno.env.get('BRIA_API_KEY');
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     
-    if (!BRIA_API_KEY) {
-      console.error('BRIA_API_KEY is not configured');
-      throw new Error('BRIA_API_KEY is not configured');
+    if (!LOVABLE_API_KEY) {
+      console.error('LOVABLE_API_KEY is not configured');
+      throw new Error('LOVABLE_API_KEY is not configured');
     }
 
     const { 
       productImageUrl, 
       sceneDescription, 
-      placementType = 'automatic',
-      aspectRatio = '1:1',
-      optimizeDescription = true
+      aspectRatio = '1:1'
     } = await req.json();
     
     if (!productImageUrl) {
@@ -33,85 +33,80 @@ serve(async (req) => {
     console.log('Generating product shot for:', productImageUrl);
     console.log('Scene description:', sceneDescription);
 
-    // Convert aspect ratio to BRIA format
-    const aspectRatioMap: Record<string, string> = {
-      '1:1': '1:1',
-      '4:5': '4:5',
-      '16:9': '16:9',
-      '9:16': '9:16',
-      '3:4': '3:4',
-      '4:3': '4:3'
-    };
+    // Use Lovable AI's image generation/editing capabilities via Gemini
+    const prompt = `Create a professional product advertisement image. 
     
-    const briaAspectRatio = aspectRatioMap[aspectRatio] || '1:1';
+Take the product shown in the image and place it in a new scene:
+${sceneDescription || 'Professional product photography with elegant background'}
 
-    // Build the request body for BRIA Product Shot API
-    const requestBody: Record<string, unknown> = {
-      image_url: productImageUrl,
-      scene_description: sceneDescription || 'Professional product photography with elegant background',
-      placement_type: placementType,
-      aspect_ratio: briaAspectRatio,
-      optimize_description: optimizeDescription
-    };
+Requirements:
+- Keep the product clearly visible and as the main focus
+- Create a visually appealing background that complements the product
+- Ensure professional lighting and composition
+- The final image should look like a high-end advertisement
+- Aspect ratio: ${aspectRatio}`;
 
-    console.log('BRIA Product Shot request:', JSON.stringify(requestBody));
+    console.log('Sending request to Lovable AI for image generation');
 
-    // Call BRIA Product Shot API
-    const response = await fetch('https://engine.prod.bria-api.com/v1/product/shot', {
+    const response = await fetch(LOVABLE_API_URL, {
       method: 'POST',
       headers: {
-        'api_token': BRIA_API_KEY,
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(requestBody),
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash-image-preview',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: prompt
+              },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: productImageUrl
+                }
+              }
+            ]
+          }
+        ],
+        modalities: ['image', 'text']
+      }),
     });
 
-    const responseText = await response.text();
-    console.log('BRIA response status:', response.status);
-    console.log('BRIA response:', responseText);
+    console.log('Lovable AI response status:', response.status);
 
     if (!response.ok) {
-      throw new Error(`BRIA API error: ${response.status} - ${responseText}`);
+      const errorText = await response.text();
+      console.error('Lovable AI error:', errorText);
+      throw new Error(`Image generation failed: ${response.status} - ${errorText}`);
     }
 
-    let data;
-    try {
-      data = JSON.parse(responseText);
-    } catch {
-      throw new Error(`Invalid JSON response from BRIA: ${responseText}`);
+    const data = await response.json();
+    console.log('Lovable AI response received');
+
+    // Extract the generated image from the response
+    const generatedImage = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    
+    if (!generatedImage) {
+      console.error('No image in response:', JSON.stringify(data));
+      throw new Error('No image was generated');
     }
 
-    // Handle async job response (202) - poll for result
-    if (response.status === 202 && data.job_id) {
-      console.log('Product shot job started, polling for result:', data.job_id);
-      
-      const result = await pollForResult(data.status_url || `https://engine.prod.bria-api.com/v1/product/shot/${data.job_id}`, BRIA_API_KEY);
-      
-      return new Response(JSON.stringify({
-        success: true,
-        images: [{
-          url: result.image_url,
-          seed: result.seed || null
-        }]
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    console.log('Product shot generated successfully');
 
-    // Handle synchronous response
-    if (data.result_url || data.image_url) {
-      return new Response(JSON.stringify({
-        success: true,
-        images: [{
-          url: data.result_url || data.image_url,
-          seed: data.seed || null
-        }]
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    throw new Error('Unexpected response format from BRIA');
+    return new Response(JSON.stringify({
+      success: true,
+      images: [{
+        url: generatedImage,
+        seed: null
+      }]
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
 
   } catch (error) {
     console.error('Error in generate-product-shot function:', error);
@@ -124,41 +119,3 @@ serve(async (req) => {
     });
   }
 });
-
-async function pollForResult(statusUrl: string, apiKey: string, maxAttempts = 60, intervalMs = 2000): Promise<{ image_url: string; seed?: number }> {
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    await new Promise(resolve => setTimeout(resolve, intervalMs));
-    
-    console.log(`Polling attempt ${attempt + 1}/${maxAttempts}`);
-    
-    const response = await fetch(statusUrl, {
-      method: 'GET',
-      headers: {
-        'api_token': apiKey,
-      },
-    });
-
-    if (!response.ok) {
-      console.error('Poll error:', response.status);
-      continue;
-    }
-
-    const data = await response.json();
-    console.log('Poll response:', JSON.stringify(data));
-
-    if (data.status === 'completed' || data.status === 'succeeded') {
-      if (data.result_url || data.image_url) {
-        return {
-          image_url: data.result_url || data.image_url,
-          seed: data.seed
-        };
-      }
-    }
-
-    if (data.status === 'failed' || data.status === 'error') {
-      throw new Error(`Product shot generation failed: ${data.error || 'Unknown error'}`);
-    }
-  }
-
-  throw new Error('Product shot generation timed out');
-}

@@ -6,9 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { BrandIntake, BrandAnalysis, AdConcept, createDefaultStructuredPrompt } from "@/types/fibo";
+import { ProductImageUpload } from "@/components/ProductImageUpload";
 
 interface BrandIntakeFormProps {
-  onAnalysisComplete: (analysis: BrandAnalysis, concepts: AdConcept[], productDescription: string) => void;
+  onAnalysisComplete: (analysis: BrandAnalysis, concepts: AdConcept[], productDescription: string, productImageUrl?: string) => void;
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
 }
@@ -21,6 +22,42 @@ const BrandIntakeForm = ({ onAnalysisComplete, isLoading, setIsLoading }: BrandI
     colorScheme: "",
     productDescription: "",
   });
+  const [productImageUrl, setProductImageUrl] = useState<string | null>(null);
+  const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
+  // Handle product image upload and auto-analyze
+  const handleProductImageUploaded = async (url: string | null) => {
+    setProductImageUrl(url);
+    
+    if (url) {
+      setIsAnalyzingImage(true);
+      try {
+        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-product-image`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ productImageUrl: url }),
+        });
+
+        const data = await response.json();
+        
+        if (data.success && data.analysis) {
+          // Auto-fill form with AI analysis
+          setFormData(prev => ({
+            ...prev,
+            productDescription: prev.productDescription || data.analysis.description,
+            mood: prev.mood || `${data.analysis.style}, ${data.analysis.suggested_mood}`,
+            colorScheme: prev.colorScheme || data.analysis.colors?.join(', ') || '',
+          }));
+        }
+      } catch (error) {
+        console.error('Error analyzing product image:', error);
+      } finally {
+        setIsAnalyzingImage(false);
+      }
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,7 +70,10 @@ const BrandIntakeForm = ({ onAnalysisComplete, isLoading, setIsLoading }: BrandI
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          productImageUrl: productImageUrl,
+        }),
       });
 
       const data = await response.json();
@@ -47,7 +87,7 @@ const BrandIntakeForm = ({ onAnalysisComplete, isLoading, setIsLoading }: BrandI
           shot_list: c.shot_list || [],
           aspect_ratio: c.aspect_ratio || '1:1'
         }));
-        onAnalysisComplete(data.brand_analysis, normalizedConcepts, formData.productDescription);
+        onAnalysisComplete(data.brand_analysis, normalizedConcepts, formData.productDescription, productImageUrl || undefined);
       } else {
         throw new Error(data.error || 'Analysis failed');
       }
@@ -76,7 +116,7 @@ const BrandIntakeForm = ({ onAnalysisComplete, isLoading, setIsLoading }: BrandI
           aspect_ratio: "1:1"
         }
       ];
-      onAnalysisComplete(demoAnalysis, demoConcepts, formData.productDescription);
+      onAnalysisComplete(demoAnalysis, demoConcepts, formData.productDescription, productImageUrl || undefined);
     } finally {
       setIsLoading(false);
     }
@@ -185,6 +225,19 @@ const BrandIntakeForm = ({ onAnalysisComplete, isLoading, setIsLoading }: BrandI
           </div>
         </div>
 
+        {/* Product Image Upload */}
+        <ProductImageUpload 
+          onImageUploaded={handleProductImageUploaded}
+          currentImageUrl={productImageUrl}
+        />
+        
+        {isAnalyzingImage && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Analyzing product image with AI...
+          </div>
+        )}
+
         <div className="space-y-2">
           <Label htmlFor="productDescription">Product Description</Label>
           <Textarea
@@ -197,7 +250,7 @@ const BrandIntakeForm = ({ onAnalysisComplete, isLoading, setIsLoading }: BrandI
           />
         </div>
 
-        <Button 
+        <Button
           type="submit" 
           className="w-full bg-gradient-gold text-primary-foreground font-semibold glow-gold btn-premium"
           disabled={isLoading}

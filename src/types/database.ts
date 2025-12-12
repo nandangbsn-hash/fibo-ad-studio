@@ -12,6 +12,8 @@ export interface Campaign {
   tone: string | null;
   key_values: string[] | null;
   recommended_palette: string | null;
+  product_image_url: string | null;
+  user_id: string | null;
   created_at: string;
   updated_at: string;
 }

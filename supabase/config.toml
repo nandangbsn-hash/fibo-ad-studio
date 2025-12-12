@@ -1,1 +1,13 @@
 project_id = "sqmzffsddfdjdczyoqbh"
+
+[functions.analyze-brand]
+verify_jwt = false
+
+[functions.generate-fibo]
+verify_jwt = false
+
+[functions.analyze-product-image]
+verify_jwt = false
+
+[functions.generate-product-shot]
+verify_jwt = false

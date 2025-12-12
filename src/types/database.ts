@@ -117,6 +117,7 @@ export interface GeneratedImageDb {
   id: string;
   campaign_id: string | null;
   concept_id: string | null;
+  user_id?: string | null;
   image_url: string;
   seed: number | null;
   structured_prompt: FiboStructuredPrompt;
@@ -126,6 +127,7 @@ export interface GeneratedImageDb {
   camera_settings: CameraSettings | null;
   visual_settings: VisualSettings | null;
   generation_type: 'initial' | 'camera_edit' | 'visual_edit' | 'studio';
+  is_public?: boolean;
   created_at: string;
 }
 

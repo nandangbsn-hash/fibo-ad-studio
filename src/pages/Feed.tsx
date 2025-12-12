@@ -1,14 +1,18 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
-import { ImageIcon, Camera, Palette, Clock, Sparkles, Loader2 } from "lucide-react";
+import { ImageIcon, Camera, Palette, Clock, Sparkles, Loader2, Globe, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Header from "@/components/Header";
 import { useFeed } from "@/hooks/useFeed";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const Feed = () => {
-  const { feedItems, isLoading } = useFeed();
+  const { feedItems, isLoading, refetch } = useFeed();
   const navigate = useNavigate();
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const handleOpenCameraDirector = (imageId: string) => {
     navigate(`/camera-director/${imageId}`);
@@ -16,6 +20,26 @@ const Feed = () => {
 
   const handleOpenVisualControls = (imageId: string) => {
     navigate(`/visual-controls/${imageId}`);
+  };
+
+  const handleTogglePublic = async (imageId: string, currentlyPublic: boolean) => {
+    setTogglingId(imageId);
+    try {
+      const { error } = await supabase
+        .from("generated_images")
+        .update({ is_public: !currentlyPublic } as never)
+        .eq("id", imageId);
+
+      if (error) throw error;
+
+      toast.success(currentlyPublic ? "Removed from Explore" : "Published to Explore!");
+      refetch();
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to update visibility");
+    } finally {
+      setTogglingId(null);
+    }
   };
 
   return (
@@ -143,9 +167,32 @@ const Feed = () => {
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <Clock className="w-3 h-3" />
-                    {format(new Date(item.created_at), 'MMM d, h:mm a')}
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <div className="flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {format(new Date(item.created_at), 'MMM d, h:mm a')}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className={`h-7 px-2 ${item.is_public ? 'text-primary' : 'text-muted-foreground'}`}
+                      onClick={() => handleTogglePublic(item.id, item.is_public || false)}
+                      disabled={togglingId === item.id}
+                    >
+                      {togglingId === item.id ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : item.is_public ? (
+                        <>
+                          <Globe className="w-3 h-3 mr-1" />
+                          Public
+                        </>
+                      ) : (
+                        <>
+                          <Lock className="w-3 h-3 mr-1" />
+                          Private
+                        </>
+                      )}
+                    </Button>
                   </div>
                 </div>
               </motion.div>

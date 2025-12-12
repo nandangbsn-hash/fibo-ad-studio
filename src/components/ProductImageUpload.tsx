@@ -188,7 +188,7 @@ export function ProductImageUpload({
       </AnimatePresence>
       
       <p className="text-xs text-muted-foreground">
-        Upload your product image and Feebo will generate an ad scene around it
+        Upload your product image and FIBO will generate an ad scene around it
       </p>
     </div>
   );

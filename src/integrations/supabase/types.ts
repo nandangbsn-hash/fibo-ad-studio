@@ -25,6 +25,7 @@ export type Database = {
           shot_list: string[] | null
           structured_prompt: Json
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           aspect_ratio?: string | null
@@ -36,6 +37,7 @@ export type Database = {
           shot_list?: string[] | null
           structured_prompt: Json
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           aspect_ratio?: string | null
@@ -47,6 +49,7 @@ export type Database = {
           shot_list?: string[] | null
           structured_prompt?: Json
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -72,6 +75,7 @@ export type Database = {
           target_audience: string | null
           tone: string | null
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           brand_name: string
@@ -86,6 +90,7 @@ export type Database = {
           target_audience?: string | null
           tone?: string | null
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           brand_name?: string
@@ -100,6 +105,7 @@ export type Database = {
           target_audience?: string | null
           tone?: string | null
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -113,9 +119,11 @@ export type Database = {
           generation_type: string | null
           id: string
           image_url: string
+          is_public: boolean
           parent_image_id: string | null
           seed: number | null
           structured_prompt: Json
+          user_id: string | null
           version: number
           visual_settings: Json | null
         }
@@ -128,9 +136,11 @@ export type Database = {
           generation_type?: string | null
           id?: string
           image_url: string
+          is_public?: boolean
           parent_image_id?: string | null
           seed?: number | null
           structured_prompt: Json
+          user_id?: string | null
           version?: number
           visual_settings?: Json | null
         }
@@ -143,9 +153,11 @@ export type Database = {
           generation_type?: string | null
           id?: string
           image_url?: string
+          is_public?: boolean
           parent_image_id?: string | null
           seed?: number | null
           structured_prompt?: Json
+          user_id?: string | null
           version?: number
           visual_settings?: Json | null
         }

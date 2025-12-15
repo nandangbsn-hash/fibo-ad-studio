@@ -6,55 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const KLING_API_URL = "https://api.klingai.com/v1/videos/image2video";
-
-// Generate JWT token for Kling API
-async function generateKlingToken(accessKey: string, secretKey: string): Promise<string> {
-  const now = Math.floor(Date.now() / 1000);
-  
-  const header = {
-    alg: "HS256",
-    typ: "JWT"
-  };
-  
-  const payload = {
-    iss: accessKey,
-    exp: now + 1800, // 30 minutes
-    nbf: now - 5     // Valid 5 seconds ago
-  };
-  
-  // Create the key for signing
-  const encoder = new TextEncoder();
-  const keyData = encoder.encode(secretKey);
-  const key = await crypto.subtle.importKey(
-    "raw",
-    keyData,
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
-  
-  // Base64URL encode helper
-  const base64UrlEncode = (data: Uint8Array | string): string => {
-    const str = typeof data === 'string' ? data : new TextDecoder().decode(data);
-    const base64 = btoa(str);
-    return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  };
-  
-  const headerB64 = base64UrlEncode(JSON.stringify(header));
-  const payloadB64 = base64UrlEncode(JSON.stringify(payload));
-  const message = `${headerB64}.${payloadB64}`;
-  
-  const signature = await crypto.subtle.sign(
-    "HMAC",
-    key,
-    encoder.encode(message)
-  );
-  
-  const signatureB64 = base64UrlEncode(new Uint8Array(signature).reduce((s, b) => s + String.fromCharCode(b), ''));
-  
-  return `${message}.${signatureB64}`;
-}
+const VEO_API_BASE = "https://generativelanguage.googleapis.com/v1beta";
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -62,112 +14,105 @@ serve(async (req) => {
   }
 
   try {
-    const KLING_ACCESS_KEY = Deno.env.get('KLING_ACCESS_KEY');
-    const KLING_SECRET_KEY = Deno.env.get('KLING_SECRET_KEY');
+    const GOOGLE_CLOUD_API_KEY = Deno.env.get('GOOGLE_CLOUD_API_KEY');
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    
-    if (!KLING_ACCESS_KEY || !KLING_SECRET_KEY) {
-      console.error('Kling API keys are not configured');
-      throw new Error('Kling API keys are not configured');
+
+    if (!GOOGLE_CLOUD_API_KEY) {
+      throw new Error('Google Cloud API key is not configured');
     }
 
     const body = await req.json();
     const { generation_id, video_id } = body;
 
     if (!generation_id) {
-      throw new Error('Generation ID (task_id) is required');
+      throw new Error('generation_id is required');
     }
 
-    console.log('Checking video status for task:', generation_id);
+    console.log('Checking Veo 3 operation status:', generation_id);
 
-    // Generate JWT token for Kling API
-    const jwtToken = await generateKlingToken(KLING_ACCESS_KEY, KLING_SECRET_KEY);
-
-    // Poll Kling API for video status
-    const response = await fetch(`${KLING_API_URL}/${generation_id}`, {
+    // Poll the operation status
+    const statusUrl = `${VEO_API_BASE}/${generation_id}?key=${GOOGLE_CLOUD_API_KEY}`;
+    
+    const statusResponse = await fetch(statusUrl, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${jwtToken}`,
         'Content-Type': 'application/json',
       },
     });
 
-    console.log('Kling API status response:', response.status);
+    console.log('Veo 3 status response:', statusResponse.status);
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Kling API error:', errorText);
-      throw new Error(`Kling API error: ${response.status} - ${errorText}`);
+    if (!statusResponse.ok) {
+      const errorText = await statusResponse.text();
+      console.error('Veo 3 status error:', errorText);
+      throw new Error(`Veo 3 status error: ${statusResponse.status} - ${errorText}`);
     }
 
-    const data = await response.json();
-    console.log('Kling API status response:', JSON.stringify(data));
+    const statusData = await statusResponse.json();
+    console.log('Veo 3 status data:', JSON.stringify(statusData));
 
-    // Kling status: submitted, processing, succeed, failed
-    const taskStatus = data.data?.task_status || 'processing';
-    const videos = data.data?.task_result?.videos || [];
-    const videoUrl = videos[0]?.url || null;
-    const videoDuration = videos[0]?.duration || null;
-
-    // Map Kling status to our status
+    // Check if operation is done
+    const isDone = statusData.done === true;
     let status = 'generating';
-    if (taskStatus === 'succeed' && videoUrl) {
-      status = 'complete';
-    } else if (taskStatus === 'failed') {
-      status = 'failed';
-    } else if (taskStatus === 'processing' || taskStatus === 'submitted') {
-      status = 'generating';
+    let videoUrl = '';
+    let errorMessage = '';
+
+    if (isDone) {
+      if (statusData.error) {
+        status = 'failed';
+        errorMessage = statusData.error.message || 'Unknown error';
+        console.error('Veo 3 generation failed:', errorMessage);
+      } else if (statusData.response?.generateVideoResponse?.generatedSamples) {
+        status = 'complete';
+        const samples = statusData.response.generateVideoResponse.generatedSamples;
+        if (samples.length > 0 && samples[0].video?.uri) {
+          // The URI needs to be converted to a downloadable URL
+          const videoUri = samples[0].video.uri;
+          // Add API key for download
+          videoUrl = `${VEO_API_BASE}/${videoUri}?key=${GOOGLE_CLOUD_API_KEY}`;
+          console.log('Video URL:', videoUrl);
+        }
+      }
     }
 
-    // Update database if video is complete or failed
-    if (video_id && SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
+    // Update database if we have a video_id
+    if (video_id && SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY && (status === 'complete' || status === 'failed')) {
       const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
       
-      if (status === 'complete' && videoUrl) {
-        const updateData: Record<string, unknown> = {
-          status: 'complete',
-          video_url: videoUrl,
-        };
-        if (videoDuration) {
-          updateData.duration = videoDuration;
-        }
-        
-        const { error: updateError } = await supabaseAdmin
-          .from('generated_videos')
-          .update(updateData)
-          .eq('id', video_id);
+      const updateData: any = {
+        status: status,
+        updated_at: new Date().toISOString(),
+      };
 
-        if (updateError) {
-          console.error('Error updating video record:', updateError);
-        } else {
-          console.log('Video record updated with URL');
-        }
-      } else if (status === 'failed') {
-        const { error: updateError } = await supabaseAdmin
-          .from('generated_videos')
-          .update({ status: 'failed' })
-          .eq('id', video_id);
+      if (videoUrl) {
+        updateData.video_url = videoUrl;
+      }
 
-        if (updateError) {
-          console.error('Error updating video record:', updateError);
-        }
+      const { error: updateError } = await supabaseAdmin
+        .from('generated_videos')
+        .update(updateData)
+        .eq('id', video_id);
+
+      if (updateError) {
+        console.error('Error updating video record:', updateError);
+      } else {
+        console.log('Video record updated successfully');
       }
     }
 
     return new Response(JSON.stringify({
       success: true,
       status: status,
+      done: isDone,
       video_url: videoUrl,
-      duration: videoDuration,
-      generation_id: generation_id,
-      task_status: taskStatus,
+      error: errorMessage || undefined,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error('Error in check-video-status:', error);
+    console.error('Error checking video status:', error);
     return new Response(JSON.stringify({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred',

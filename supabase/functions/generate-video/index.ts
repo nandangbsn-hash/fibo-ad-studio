@@ -6,7 +6,55 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const AIML_API_URL = "https://api.aimlapi.com/v2/video/generations";
+const KLING_API_URL = "https://api.klingai.com/v1/videos/image2video";
+
+// Generate JWT token for Kling API
+async function generateKlingToken(accessKey: string, secretKey: string): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  
+  const header = {
+    alg: "HS256",
+    typ: "JWT"
+  };
+  
+  const payload = {
+    iss: accessKey,
+    exp: now + 1800, // 30 minutes
+    nbf: now - 5     // Valid 5 seconds ago
+  };
+  
+  // Create the key for signing
+  const encoder = new TextEncoder();
+  const keyData = encoder.encode(secretKey);
+  const key = await crypto.subtle.importKey(
+    "raw",
+    keyData,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  
+  // Base64URL encode helper
+  const base64UrlEncode = (data: Uint8Array | string): string => {
+    const str = typeof data === 'string' ? data : new TextDecoder().decode(data);
+    const base64 = btoa(str);
+    return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  };
+  
+  const headerB64 = base64UrlEncode(JSON.stringify(header));
+  const payloadB64 = base64UrlEncode(JSON.stringify(payload));
+  const message = `${headerB64}.${payloadB64}`;
+  
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    encoder.encode(message)
+  );
+  
+  const signatureB64 = base64UrlEncode(new Uint8Array(signature).reduce((s, b) => s + String.fromCharCode(b), ''));
+  
+  return `${message}.${signatureB64}`;
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -14,13 +62,14 @@ serve(async (req) => {
   }
 
   try {
-    const AIML_API_KEY = Deno.env.get('AIML_API_KEY');
+    const KLING_ACCESS_KEY = Deno.env.get('KLING_ACCESS_KEY');
+    const KLING_SECRET_KEY = Deno.env.get('KLING_SECRET_KEY');
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
-    if (!AIML_API_KEY) {
-      console.error('AIML_API_KEY is not configured');
-      throw new Error('AIML_API_KEY is not configured');
+    if (!KLING_ACCESS_KEY || !KLING_SECRET_KEY) {
+      console.error('Kling API keys are not configured');
+      throw new Error('Kling API keys are not configured');
     }
 
     // Extract user ID from Authorization header
@@ -43,51 +92,57 @@ serve(async (req) => {
       source_image_id,
       prompt, 
       aspect_ratio = '16:9',
-      resolution = '1080p'
+      duration = '5'
     } = body;
 
     if (!source_image_url) {
       throw new Error('Source image URL is required');
     }
 
-    console.log('Generating video with Veo 3.1 for:', source_image_url);
+    console.log('Generating video with Kling API for:', source_image_url);
     console.log('Prompt:', prompt);
     console.log('Aspect ratio:', aspect_ratio);
-    console.log('Resolution:', resolution);
+    console.log('Duration:', duration);
 
-    // Submit video generation task to AI/ML API
-    const response = await fetch(AIML_API_URL, {
+    // Generate JWT token for Kling API
+    const jwtToken = await generateKlingToken(KLING_ACCESS_KEY, KLING_SECRET_KEY);
+    console.log('Generated Kling JWT token');
+
+    // Submit video generation task to Kling API
+    const response = await fetch(KLING_API_URL, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${AIML_API_KEY}`,
+        'Authorization': `Bearer ${jwtToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/veo-3.1-i2v',
-        image_url: source_image_url,
+        model_name: 'kling-v1',
+        image: source_image_url,
         prompt: prompt || 'Subtle camera movement, cinematic product reveal',
+        negative_prompt: '',
+        cfg_scale: 0.5,
+        mode: 'std',
+        duration: duration,
         aspect_ratio: aspect_ratio,
-        resolution: resolution,
-        generate_audio: false,
       }),
     });
 
-    console.log('AI/ML API response status:', response.status);
+    console.log('Kling API response status:', response.status);
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('AI/ML API error:', errorText);
-      throw new Error(`AI/ML API error: ${response.status} - ${errorText}`);
+      console.error('Kling API error:', errorText);
+      throw new Error(`Kling API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
-    console.log('AI/ML API response:', JSON.stringify(data));
+    console.log('Kling API response:', JSON.stringify(data));
 
-    const generationId = data.id || data.generation_id;
+    const taskId = data.data?.task_id;
     
-    if (!generationId) {
-      console.error('No generation ID in response:', JSON.stringify(data));
-      throw new Error('No generation ID was returned');
+    if (!taskId) {
+      console.error('No task ID in response:', JSON.stringify(data));
+      throw new Error('No task ID was returned from Kling API');
     }
 
     // Save initial video record to database
@@ -100,9 +155,9 @@ serve(async (req) => {
         video_url: '',
         video_prompt: prompt,
         aspect_ratio: aspect_ratio,
-        resolution: resolution,
+        duration: parseInt(duration),
         status: 'generating',
-        generation_id: generationId,
+        generation_id: taskId,
         is_public: false,
       };
 
@@ -120,7 +175,7 @@ serve(async (req) => {
         return new Response(JSON.stringify({
           success: true,
           video_id: insertedVideo.id,
-          generation_id: generationId,
+          generation_id: taskId,
           status: 'generating',
           message: 'Video generation started. Poll for status updates.',
         }), {
@@ -131,7 +186,7 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true,
-      generation_id: generationId,
+      generation_id: taskId,
       status: 'generating',
       message: 'Video generation started',
     }), {

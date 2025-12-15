@@ -14,12 +14,12 @@ serve(async (req) => {
   }
 
   try {
-    const GOOGLE_CLOUD_API_KEY = Deno.env.get('GOOGLE_CLOUD_API_KEY');
+    const GEMINI_API_KEY = Deno.env.get('GOOGLE_GEMINI_API_KEY') || Deno.env.get('GOOGLE_CLOUD_API_KEY');
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-    if (!GOOGLE_CLOUD_API_KEY) {
-      throw new Error('Google Cloud API key is not configured');
+    if (!GEMINI_API_KEY) {
+      throw new Error('Google API key is not configured');
     }
 
     const body = await req.json();
@@ -31,13 +31,14 @@ serve(async (req) => {
 
     console.log('Checking Veo 3 operation status:', generation_id);
 
-    // Poll the operation status
-    const statusUrl = `${VEO_API_BASE}/${generation_id}?key=${GOOGLE_CLOUD_API_KEY}`;
+    // Poll the operation status using x-goog-api-key header
+    const statusUrl = `${VEO_API_BASE}/${generation_id}`;
     
     const statusResponse = await fetch(statusUrl, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
+        'x-goog-api-key': GEMINI_API_KEY,
       },
     });
 
@@ -67,11 +68,17 @@ serve(async (req) => {
         status = 'complete';
         const samples = statusData.response.generateVideoResponse.generatedSamples;
         if (samples.length > 0 && samples[0].video?.uri) {
-          // The URI needs to be converted to a downloadable URL
+          // The URI is a relative path, need to construct full URL with API key
           const videoUri = samples[0].video.uri;
-          // Add API key for download
-          videoUrl = `${VEO_API_BASE}/${videoUri}?key=${GOOGLE_CLOUD_API_KEY}`;
-          console.log('Video URL:', videoUrl);
+          // The URI format is like "files/xxxxx:download?alt=media"
+          // Need to append to base URL
+          if (videoUri.startsWith('files/')) {
+            videoUrl = `${VEO_API_BASE}/${videoUri}`;
+          } else {
+            videoUrl = videoUri;
+          }
+          console.log('Video URI from response:', videoUri);
+          console.log('Constructed video URL:', videoUrl);
         }
       }
     }
@@ -107,6 +114,8 @@ serve(async (req) => {
       done: isDone,
       video_url: videoUrl,
       error: errorMessage || undefined,
+      // Include API key hint for client-side download if needed
+      needs_api_key: videoUrl ? true : false,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

@@ -7,19 +7,43 @@ import { useToast } from "@/hooks/use-toast";
 export function useFeed() {
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
   const { toast } = useToast();
 
+  // Get current user
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUserId(user?.id || null);
+    };
+    getUser();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+      setUserId(session?.user?.id || null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
   const fetchFeed = async () => {
+    if (!userId) {
+      setFeedItems([]);
+      setIsLoading(false);
+      return;
+    }
+
     try {
+      // Only fetch images belonging to the current user
       const { data: images, error: imagesError } = await supabase
         .from('generated_images')
         .select('*')
+        .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
       if (imagesError) throw imagesError;
 
-      const { data: campaigns } = await supabase.from('campaigns').select('*');
-      const { data: concepts } = await supabase.from('ad_concepts').select('*');
+      const { data: campaigns } = await supabase.from('campaigns').select('*').eq('user_id', userId);
+      const { data: concepts } = await supabase.from('ad_concepts').select('*').eq('user_id', userId);
 
       const enrichedItems: FeedItem[] = (images || []).map((img) => ({
         ...img,
@@ -44,15 +68,19 @@ export function useFeed() {
   };
 
   useEffect(() => {
-    fetchFeed();
+    if (userId !== null) {
+      fetchFeed();
+    }
 
     const channel = supabase
       .channel('generated_images_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'generated_images' }, () => fetchFeed())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'generated_images' }, () => {
+        if (userId) fetchFeed();
+      })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, []);
+  }, [userId]);
 
   return { feedItems, isLoading, refetch: fetchFeed };
 }

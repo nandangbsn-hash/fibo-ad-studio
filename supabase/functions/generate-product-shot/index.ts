@@ -77,8 +77,8 @@ serve(async (req) => {
     const data = await response.json();
     console.log('BRIA API response received:', JSON.stringify(data));
 
-    // Extract the generated image from BRIA response
-    const generatedImage = data.result_url || data.urls?.[0];
+    // Extract the generated image from BRIA response - image_url is nested in result object
+    const generatedImage = data.result?.image_url || data.result_url || data.urls?.[0];
     
     if (!generatedImage) {
       console.error('No image in BRIA response:', JSON.stringify(data));

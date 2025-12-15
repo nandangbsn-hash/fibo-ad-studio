@@ -51,6 +51,7 @@ serve(async (req) => {
     console.log('User ID:', userId);
 
     // Use BRIA's replace_background endpoint for product shots
+    // BRIA API expects 'image' field, not 'image_url'
     const response = await fetch(`${BRIA_API_URL}/image/edit/replace_background`, {
       method: 'POST',
       headers: {
@@ -58,7 +59,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        image_url: productImageUrl,
+        image: productImageUrl,
         prompt: sceneDescription || 'Professional product photography with elegant studio background, soft lighting',
         sync: true,
         original_quality: true,

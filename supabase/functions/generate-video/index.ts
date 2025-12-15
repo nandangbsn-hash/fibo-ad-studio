@@ -6,19 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const HEYGEN_UPLOAD_URL = "https://upload.heygen.com/v1/talking_photo";
-const HEYGEN_GENERATE_URL = "https://api.heygen.com/v2/video/generate";
-
-// Helper to convert base64 to ArrayBuffer
-function base64ToArrayBuffer(base64: string): ArrayBuffer {
-  const binaryString = atob(base64);
-  const bytes = new ArrayBuffer(binaryString.length);
-  const view = new Uint8Array(bytes);
-  for (let i = 0; i < binaryString.length; i++) {
-    view[i] = binaryString.charCodeAt(i);
-  }
-  return bytes;
-}
+const VEO_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -26,13 +14,13 @@ serve(async (req) => {
   }
 
   try {
-    const HEYGEN_API_KEY = Deno.env.get('HEYGEN_API_KEY');
+    const GOOGLE_CLOUD_API_KEY = Deno.env.get('GOOGLE_CLOUD_API_KEY');
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
-    if (!HEYGEN_API_KEY) {
-      console.error('HeyGen API key is not configured');
-      throw new Error('HeyGen API key is not configured');
+    if (!GOOGLE_CLOUD_API_KEY) {
+      console.error('Google Cloud API key is not configured');
+      throw new Error('Google Cloud API key is not configured');
     }
 
     // Extract user ID from Authorization header
@@ -58,122 +46,105 @@ serve(async (req) => {
       duration = '5'
     } = body;
 
-    if (!source_image_url) {
-      throw new Error('Source image URL is required');
+    if (!prompt) {
+      throw new Error('Prompt is required for video generation');
     }
 
-    console.log('Generating video with HeyGen API');
+    console.log('Generating video with Google Veo 3 API');
     console.log('Prompt:', prompt);
     console.log('Aspect ratio:', aspect_ratio);
+    console.log('Duration:', duration);
 
-    // Step 1: Upload image to get talking_photo_id
-    let imageBuffer: ArrayBuffer;
-    let contentType = 'image/png';
-    
-    if (source_image_url.startsWith('data:')) {
-      // Extract content type and base64 data
-      const match = source_image_url.match(/^data:(image\/[a-zA-Z]+);base64,(.+)$/);
-      if (match) {
-        contentType = match[1];
-        const base64Data = match[2];
-        imageBuffer = base64ToArrayBuffer(base64Data);
-        console.log('Extracted image data, size:', imageBuffer.byteLength, 'bytes');
+    // Prepare image for Veo if provided
+    let imageData = null;
+    if (source_image_url) {
+      if (source_image_url.startsWith('data:')) {
+        const match = source_image_url.match(/^data:(image\/[a-zA-Z]+);base64,(.+)$/);
+        if (match) {
+          imageData = {
+            mimeType: match[1],
+            data: match[2],
+          };
+        }
       } else {
-        throw new Error('Invalid data URL format');
+        // Fetch image and convert to base64
+        const imageResponse = await fetch(source_image_url);
+        if (imageResponse.ok) {
+          const arrayBuffer = await imageResponse.arrayBuffer();
+          const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+          const contentType = imageResponse.headers.get('content-type') || 'image/png';
+          imageData = {
+            mimeType: contentType,
+            data: base64,
+          };
+        }
       }
-    } else {
-      // Fetch image from URL
-      const imageResponse = await fetch(source_image_url);
-      if (!imageResponse.ok) {
-        throw new Error('Failed to fetch source image');
-      }
-      imageBuffer = await imageResponse.arrayBuffer();
-      contentType = imageResponse.headers.get('content-type') || 'image/png';
+      console.log('Image data prepared for Veo');
     }
 
-    console.log('Uploading image to HeyGen...');
-    
-    const uploadResponse = await fetch(HEYGEN_UPLOAD_URL, {
-      method: 'POST',
-      headers: {
-        'X-Api-Key': HEYGEN_API_KEY,
-        'Content-Type': contentType,
-      },
-      body: imageBuffer,
-    });
+    // Build the Veo 3 request
+    const veoModel = "veo-3.0-generate-preview";
+    const veoUrl = `${VEO_API_BASE}/${veoModel}:predictLongRunning?key=${GOOGLE_CLOUD_API_KEY}`;
 
-    console.log('HeyGen upload response status:', uploadResponse.status);
-
-    if (!uploadResponse.ok) {
-      const errorText = await uploadResponse.text();
-      console.error('HeyGen upload error:', errorText);
-      throw new Error(`HeyGen upload error: ${uploadResponse.status} - ${errorText}`);
-    }
-
-    const uploadData = await uploadResponse.json();
-    console.log('HeyGen upload response:', JSON.stringify(uploadData));
-
-    const talkingPhotoId = uploadData.data?.talking_photo_id;
-    if (!talkingPhotoId) {
-      throw new Error('No talking_photo_id returned from HeyGen');
-    }
-
-    console.log('Got talking_photo_id:', talkingPhotoId);
-
-    // Step 2: Generate video with the talking photo
-    const dimensionMap: Record<string, { width: number; height: number }> = {
-      '16:9': { width: 1920, height: 1080 },
-      '9:16': { width: 1080, height: 1920 },
-      '1:1': { width: 1080, height: 1080 },
+    // Map aspect ratio
+    const aspectRatioMap: Record<string, string> = {
+      '16:9': '16:9',
+      '9:16': '9:16',
+      '1:1': '1:1',
     };
-    const dimension = dimensionMap[aspect_ratio] || dimensionMap['16:9'];
 
-    const generatePayload = {
-      video_inputs: [
+    const requestBody: any = {
+      instances: [
         {
-          character: {
-            type: 'talking_photo',
-            talking_photo_id: talkingPhotoId,
-          },
-          voice: {
-            type: 'text',
-            input_text: prompt || 'Presenting this product with subtle natural movement.',
-            voice_id: '2d5b0e6cf36f460aa7fc47e3eee4ba54', // Default English voice
-          },
-        },
+          prompt: prompt,
+        }
       ],
-      dimension: dimension,
-      test: false,
+      parameters: {
+        aspectRatio: aspectRatioMap[aspect_ratio] || '16:9',
+        durationSeconds: parseInt(duration) || 5,
+        numberOfVideos: 1,
+      }
     };
 
-    console.log('Generating video with payload:', JSON.stringify(generatePayload));
+    // Add image if provided
+    if (imageData) {
+      requestBody.instances[0].image = {
+        bytesBase64Encoded: imageData.data,
+        mimeType: imageData.mimeType,
+      };
+    }
 
-    const response = await fetch(HEYGEN_GENERATE_URL, {
+    console.log('Sending request to Veo 3...');
+    console.log('Request URL:', veoUrl);
+
+    const response = await fetch(veoUrl, {
       method: 'POST',
       headers: {
-        'X-Api-Key': HEYGEN_API_KEY,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(generatePayload),
+      body: JSON.stringify(requestBody),
     });
 
-    console.log('HeyGen generate response status:', response.status);
+    console.log('Veo 3 response status:', response.status);
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('HeyGen generate error:', errorText);
-      throw new Error(`HeyGen API error: ${response.status} - ${errorText}`);
+      console.error('Veo 3 error:', errorText);
+      throw new Error(`Veo 3 API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
-    console.log('HeyGen generate response:', JSON.stringify(data));
+    console.log('Veo 3 response:', JSON.stringify(data));
 
-    const videoId = data.data?.video_id;
+    // The response contains an operation name for long-running operations
+    const operationName = data.name;
     
-    if (!videoId) {
-      console.error('No video ID in response:', JSON.stringify(data));
-      throw new Error('No video ID was returned from HeyGen API');
+    if (!operationName) {
+      console.error('No operation name in response:', JSON.stringify(data));
+      throw new Error('No operation name was returned from Veo 3 API');
     }
+
+    console.log('Got operation name:', operationName);
 
     // Save initial video record to database
     if (userId && SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
@@ -187,7 +158,7 @@ serve(async (req) => {
         aspect_ratio: aspect_ratio,
         duration: parseInt(duration),
         status: 'generating',
-        generation_id: videoId,
+        generation_id: operationName,
         is_public: false,
       };
 
@@ -205,9 +176,9 @@ serve(async (req) => {
         return new Response(JSON.stringify({
           success: true,
           video_id: insertedVideo.id,
-          generation_id: videoId,
+          generation_id: operationName,
           status: 'generating',
-          message: 'Video generation started. Poll for status updates.',
+          message: 'Video generation started with Veo 3. Poll for status updates.',
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -216,9 +187,9 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true,
-      generation_id: videoId,
+      generation_id: operationName,
       status: 'generating',
-      message: 'Video generation started',
+      message: 'Video generation started with Veo 3',
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

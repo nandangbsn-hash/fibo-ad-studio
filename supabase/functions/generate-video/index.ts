@@ -185,9 +185,8 @@ serve(async (req) => {
       console.log('Added image to request for image-to-video generation');
     }
 
-    // Vertex AI endpoint for Veo - using imagen for video generation
-    // Note: Veo model name might vary, trying veo-001 or imagen-3.0-generate-002
-    const vertexUrl = `https://us-central1-aiplatform.googleapis.com/v1/projects/${projectId}/locations/us-central1/publishers/google/models/veo-001:predictLongRunning`;
+    // Vertex AI endpoint for Veo 3
+    const vertexUrl = `https://us-central1-aiplatform.googleapis.com/v1/projects/${projectId}/locations/us-central1/publishers/google/models/veo-3.0-generate-001:predictLongRunning`;
     
     console.log('Sending request to Vertex AI...');
     console.log('Request URL:', vertexUrl);

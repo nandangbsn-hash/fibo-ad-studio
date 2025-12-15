@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,10 +15,23 @@ serve(async (req) => {
 
   try {
     const BRIA_API_KEY = Deno.env.get('BRIA_API_KEY');
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
     if (!BRIA_API_KEY) {
       console.error('BRIA_API_KEY is not configured');
       throw new Error('BRIA_API_KEY is not configured');
+    }
+
+    // Extract user ID from Authorization header
+    let userId: string | null = null;
+    const authHeader = req.headers.get('authorization');
+    if (authHeader && SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
+      const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user } } = await supabase.auth.getUser(token);
+      userId = user?.id || null;
+      console.log('User ID from token:', userId);
     }
 
     const body = await req.json();
@@ -28,7 +42,9 @@ serve(async (req) => {
       seed,
       guidance_scale = 5,
       steps_num = 50,
-      sync = true 
+      sync = true,
+      campaign_id,
+      concept_id
     } = body;
     
     const hasPromptValue = prompt && typeof prompt === 'string' && prompt.trim().length > 0;
@@ -40,7 +56,8 @@ serve(async (req) => {
       hasStructuredPrompt: hasStructuredPromptValue,
       structuredPromptType: typeof structured_prompt,
       aspect_ratio,
-      sync
+      sync,
+      userId
     });
 
     // Build the request body according to Bria API v2
@@ -310,12 +327,46 @@ serve(async (req) => {
 
     const data = JSON.parse(responseText);
 
+    // Helper function to save image to database
+    const saveToDatabase = async (imageUrl: string, imageSeed: number | null, structuredPromptResult: any) => {
+      if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+        console.log('Supabase not configured, skipping database save');
+        return;
+      }
+      
+      try {
+        const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+        const { error } = await supabase.from('generated_images').insert({
+          image_url: imageUrl,
+          seed: imageSeed,
+          structured_prompt: structuredPromptResult || structured_prompt,
+          aspect_ratio: aspect_ratio,
+          user_id: userId,
+          campaign_id: campaign_id || null,
+          concept_id: concept_id || null,
+          generation_type: 'initial',
+          is_public: false
+        });
+        
+        if (error) {
+          console.error('Failed to save image to database:', error);
+        } else {
+          console.log('Image saved to database with user_id:', userId);
+        }
+      } catch (dbError) {
+        console.error('Database save error:', dbError);
+      }
+    };
+
     // Handle async response (status 202)
     if (response.status === 202 && data.status_url) {
       console.log('Async request, polling status URL:', data.status_url);
       
       // Poll for completion
       const result = await pollForResult(data.status_url, BRIA_API_KEY);
+      
+      // Save to database
+      await saveToDatabase(result.image_url, result.seed, result.structured_prompt);
       
       return new Response(JSON.stringify({
         success: true,
@@ -330,6 +381,9 @@ serve(async (req) => {
 
     // Sync response (status 200)
     if (data.result) {
+      // Save to database
+      await saveToDatabase(data.result.image_url, data.result.seed, data.result.structured_prompt);
+      
       return new Response(JSON.stringify({
         success: true,
         image_url: data.result.image_url,

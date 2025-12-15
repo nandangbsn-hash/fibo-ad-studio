@@ -6,7 +6,19 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const HEYGEN_API_URL = "https://api.heygen.com/v2/video/generate";
+const HEYGEN_UPLOAD_URL = "https://upload.heygen.com/v1/talking_photo";
+const HEYGEN_GENERATE_URL = "https://api.heygen.com/v2/video/generate";
+
+// Helper to convert base64 to ArrayBuffer
+function base64ToArrayBuffer(base64: string): ArrayBuffer {
+  const binaryString = atob(base64);
+  const bytes = new ArrayBuffer(binaryString.length);
+  const view = new Uint8Array(bytes);
+  for (let i = 0; i < binaryString.length; i++) {
+    view[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -50,15 +62,65 @@ serve(async (req) => {
       throw new Error('Source image URL is required');
     }
 
-    // For HeyGen, we need to use the full data URL or a publicly accessible URL
-    let imageUrl = source_image_url;
-    
     console.log('Generating video with HeyGen API');
     console.log('Prompt:', prompt);
     console.log('Aspect ratio:', aspect_ratio);
-    console.log('Duration:', duration);
 
-    // Map aspect ratio to HeyGen dimension format
+    // Step 1: Upload image to get talking_photo_id
+    let imageBuffer: ArrayBuffer;
+    let contentType = 'image/png';
+    
+    if (source_image_url.startsWith('data:')) {
+      // Extract content type and base64 data
+      const match = source_image_url.match(/^data:(image\/[a-zA-Z]+);base64,(.+)$/);
+      if (match) {
+        contentType = match[1];
+        const base64Data = match[2];
+        imageBuffer = base64ToArrayBuffer(base64Data);
+        console.log('Extracted image data, size:', imageBuffer.byteLength, 'bytes');
+      } else {
+        throw new Error('Invalid data URL format');
+      }
+    } else {
+      // Fetch image from URL
+      const imageResponse = await fetch(source_image_url);
+      if (!imageResponse.ok) {
+        throw new Error('Failed to fetch source image');
+      }
+      imageBuffer = await imageResponse.arrayBuffer();
+      contentType = imageResponse.headers.get('content-type') || 'image/png';
+    }
+
+    console.log('Uploading image to HeyGen...');
+    
+    const uploadResponse = await fetch(HEYGEN_UPLOAD_URL, {
+      method: 'POST',
+      headers: {
+        'X-Api-Key': HEYGEN_API_KEY,
+        'Content-Type': contentType,
+      },
+      body: imageBuffer,
+    });
+
+    console.log('HeyGen upload response status:', uploadResponse.status);
+
+    if (!uploadResponse.ok) {
+      const errorText = await uploadResponse.text();
+      console.error('HeyGen upload error:', errorText);
+      throw new Error(`HeyGen upload error: ${uploadResponse.status} - ${errorText}`);
+    }
+
+    const uploadData = await uploadResponse.json();
+    console.log('HeyGen upload response:', JSON.stringify(uploadData));
+
+    const talkingPhotoId = uploadData.data?.talking_photo_id;
+    if (!talkingPhotoId) {
+      throw new Error('No talking_photo_id returned from HeyGen');
+    }
+
+    console.log('Got talking_photo_id:', talkingPhotoId);
+
+    // Step 2: Generate video with the talking photo
     const dimensionMap: Record<string, { width: number; height: number }> = {
       '16:9': { width: 1920, height: 1080 },
       '9:16': { width: 1080, height: 1920 },
@@ -66,42 +128,45 @@ serve(async (req) => {
     };
     const dimension = dimensionMap[aspect_ratio] || dimensionMap['16:9'];
 
-    // HeyGen image-to-video request
-    const response = await fetch(HEYGEN_API_URL, {
+    const generatePayload = {
+      video_inputs: [
+        {
+          character: {
+            type: 'talking_photo',
+            talking_photo_id: talkingPhotoId,
+          },
+          voice: {
+            type: 'text',
+            input_text: prompt || 'Presenting this product with subtle natural movement.',
+            voice_id: '2d5b0e6cf36f460aa7fc47e3eee4ba54', // Default English voice
+          },
+        },
+      ],
+      dimension: dimension,
+      test: false,
+    };
+
+    console.log('Generating video with payload:', JSON.stringify(generatePayload));
+
+    const response = await fetch(HEYGEN_GENERATE_URL, {
       method: 'POST',
       headers: {
         'X-Api-Key': HEYGEN_API_KEY,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        video_inputs: [
-          {
-            character: {
-              type: 'photo',
-              photo_url: imageUrl,
-            },
-            voice: {
-              type: 'text',
-              input_text: prompt || 'Subtle camera movement, cinematic product reveal',
-              voice_id: 'en-US-JennyNeural',
-            },
-          },
-        ],
-        dimension: dimension,
-        test: false,
-      }),
+      body: JSON.stringify(generatePayload),
     });
 
-    console.log('HeyGen API response status:', response.status);
+    console.log('HeyGen generate response status:', response.status);
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('HeyGen API error:', errorText);
+      console.error('HeyGen generate error:', errorText);
       throw new Error(`HeyGen API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
-    console.log('HeyGen API response:', JSON.stringify(data));
+    console.log('HeyGen generate response:', JSON.stringify(data));
 
     const videoId = data.data?.video_id;
     

@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const LOVABLE_API_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const BRIA_API_URL = "https://engine.prod.bria-api.com/v2";
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -14,13 +14,13 @@ serve(async (req) => {
   }
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    const BRIA_API_KEY = Deno.env.get('BRIA_API_KEY');
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
-    if (!LOVABLE_API_KEY) {
-      console.error('LOVABLE_API_KEY is not configured');
-      throw new Error('LOVABLE_API_KEY is not configured');
+    if (!BRIA_API_KEY) {
+      console.error('BRIA_API_KEY is not configured');
+      throw new Error('BRIA_API_KEY is not configured');
     }
 
     // Extract user ID from Authorization header
@@ -46,74 +46,45 @@ serve(async (req) => {
       throw new Error('Product image URL is required');
     }
 
-    console.log('Generating product shot for:', productImageUrl);
+    console.log('Generating product shot with BRIA for:', productImageUrl);
     console.log('Scene description:', sceneDescription);
     console.log('User ID:', userId);
 
-    // Use Lovable AI's image generation/editing capabilities via Gemini
-    const prompt = `Create a professional product advertisement image. 
-    
-Take the product shown in the image and place it in a new scene:
-${sceneDescription || 'Professional product photography with elegant background'}
-
-Requirements:
-- Keep the product clearly visible and as the main focus
-- Create a visually appealing background that complements the product
-- Ensure professional lighting and composition
-- The final image should look like a high-end advertisement
-- Aspect ratio: ${aspectRatio}`;
-
-    console.log('Sending request to Lovable AI for image generation');
-
-    const response = await fetch(LOVABLE_API_URL, {
+    // Use BRIA's replace_background endpoint for product shots
+    const response = await fetch(`${BRIA_API_URL}/image/edit/replace_background`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'api_token': BRIA_API_KEY,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash-image-preview',
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: prompt
-              },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: productImageUrl
-                }
-              }
-            ]
-          }
-        ],
-        modalities: ['image', 'text']
+        image_url: productImageUrl,
+        prompt: sceneDescription || 'Professional product photography with elegant studio background, soft lighting',
+        sync: true,
+        original_quality: true,
       }),
     });
 
-    console.log('Lovable AI response status:', response.status);
+    console.log('BRIA API response status:', response.status);
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Lovable AI error:', errorText);
-      throw new Error(`Image generation failed: ${response.status} - ${errorText}`);
+      console.error('BRIA API error:', errorText);
+      throw new Error(`BRIA API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
-    console.log('Lovable AI response received');
+    console.log('BRIA API response received:', JSON.stringify(data));
 
-    // Extract the generated image from the response
-    const generatedImage = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    // Extract the generated image from BRIA response
+    const generatedImage = data.result_url || data.urls?.[0];
     
     if (!generatedImage) {
-      console.error('No image in response:', JSON.stringify(data));
+      console.error('No image in BRIA response:', JSON.stringify(data));
       throw new Error('No image was generated');
     }
 
-    console.log('Product shot generated successfully');
+    console.log('Product shot generated successfully:', generatedImage);
 
     // Save to database if user is authenticated
     if (userId && SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {

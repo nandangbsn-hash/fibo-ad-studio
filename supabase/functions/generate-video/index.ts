@@ -6,55 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const KLING_API_URL = "https://api.klingai.com/v1/videos/image2video";
-
-// Generate JWT token for Kling API
-async function generateKlingToken(accessKey: string, secretKey: string): Promise<string> {
-  const now = Math.floor(Date.now() / 1000);
-  
-  const header = {
-    alg: "HS256",
-    typ: "JWT"
-  };
-  
-  const payload = {
-    iss: accessKey,
-    exp: now + 1800, // 30 minutes
-    nbf: now - 5     // Valid 5 seconds ago
-  };
-  
-  // Create the key for signing
-  const encoder = new TextEncoder();
-  const keyData = encoder.encode(secretKey);
-  const key = await crypto.subtle.importKey(
-    "raw",
-    keyData,
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
-  
-  // Base64URL encode helper
-  const base64UrlEncode = (data: Uint8Array | string): string => {
-    const str = typeof data === 'string' ? data : new TextDecoder().decode(data);
-    const base64 = btoa(str);
-    return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  };
-  
-  const headerB64 = base64UrlEncode(JSON.stringify(header));
-  const payloadB64 = base64UrlEncode(JSON.stringify(payload));
-  const message = `${headerB64}.${payloadB64}`;
-  
-  const signature = await crypto.subtle.sign(
-    "HMAC",
-    key,
-    encoder.encode(message)
-  );
-  
-  const signatureB64 = base64UrlEncode(new Uint8Array(signature).reduce((s, b) => s + String.fromCharCode(b), ''));
-  
-  return `${message}.${signatureB64}`;
-}
+const HEYGEN_API_URL = "https://api.heygen.com/v2/video/generate";
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -62,14 +14,13 @@ serve(async (req) => {
   }
 
   try {
-    const KLING_ACCESS_KEY = Deno.env.get('KLING_ACCESS_KEY');
-    const KLING_SECRET_KEY = Deno.env.get('KLING_SECRET_KEY');
+    const HEYGEN_API_KEY = Deno.env.get('HEYGEN_API_KEY');
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
-    if (!KLING_ACCESS_KEY || !KLING_SECRET_KEY) {
-      console.error('Kling API keys are not configured');
-      throw new Error('Kling API keys are not configured');
+    if (!HEYGEN_API_KEY) {
+      console.error('HeyGen API key is not configured');
+      throw new Error('HeyGen API key is not configured');
     }
 
     // Extract user ID from Authorization header
@@ -99,61 +50,64 @@ serve(async (req) => {
       throw new Error('Source image URL is required');
     }
 
-    // Extract base64 data from data URL if present
-    let imageData = source_image_url;
-    if (source_image_url.startsWith('data:')) {
-      // Strip the data URL prefix (e.g., "data:image/png;base64,")
-      const base64Match = source_image_url.match(/^data:image\/[a-zA-Z]+;base64,(.+)$/);
-      if (base64Match) {
-        imageData = base64Match[1];
-        console.log('Extracted base64 data from data URL, length:', imageData.length);
-      }
-    }
-
-    console.log('Generating video with Kling API');
+    // For HeyGen, we need to use the full data URL or a publicly accessible URL
+    let imageUrl = source_image_url;
+    
+    console.log('Generating video with HeyGen API');
     console.log('Prompt:', prompt);
     console.log('Aspect ratio:', aspect_ratio);
     console.log('Duration:', duration);
 
-    // Generate JWT token for Kling API
-    const jwtToken = await generateKlingToken(KLING_ACCESS_KEY, KLING_SECRET_KEY);
-    console.log('Generated Kling JWT token');
+    // Map aspect ratio to HeyGen dimension format
+    const dimensionMap: Record<string, { width: number; height: number }> = {
+      '16:9': { width: 1920, height: 1080 },
+      '9:16': { width: 1080, height: 1920 },
+      '1:1': { width: 1080, height: 1080 },
+    };
+    const dimension = dimensionMap[aspect_ratio] || dimensionMap['16:9'];
 
-    // Submit video generation task to Kling API
-    const response = await fetch(KLING_API_URL, {
+    // HeyGen image-to-video request
+    const response = await fetch(HEYGEN_API_URL, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${jwtToken}`,
+        'X-Api-Key': HEYGEN_API_KEY,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model_name: 'kling-v1',
-        image: imageData,
-        prompt: prompt || 'Subtle camera movement, cinematic product reveal',
-        negative_prompt: '',
-        cfg_scale: 0.5,
-        mode: 'std',
-        duration: duration,
-        aspect_ratio: aspect_ratio,
+        video_inputs: [
+          {
+            character: {
+              type: 'photo',
+              photo_url: imageUrl,
+            },
+            voice: {
+              type: 'text',
+              input_text: prompt || 'Subtle camera movement, cinematic product reveal',
+              voice_id: 'en-US-JennyNeural',
+            },
+          },
+        ],
+        dimension: dimension,
+        test: false,
       }),
     });
 
-    console.log('Kling API response status:', response.status);
+    console.log('HeyGen API response status:', response.status);
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Kling API error:', errorText);
-      throw new Error(`Kling API error: ${response.status} - ${errorText}`);
+      console.error('HeyGen API error:', errorText);
+      throw new Error(`HeyGen API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
-    console.log('Kling API response:', JSON.stringify(data));
+    console.log('HeyGen API response:', JSON.stringify(data));
 
-    const taskId = data.data?.task_id;
+    const videoId = data.data?.video_id;
     
-    if (!taskId) {
-      console.error('No task ID in response:', JSON.stringify(data));
-      throw new Error('No task ID was returned from Kling API');
+    if (!videoId) {
+      console.error('No video ID in response:', JSON.stringify(data));
+      throw new Error('No video ID was returned from HeyGen API');
     }
 
     // Save initial video record to database
@@ -168,7 +122,7 @@ serve(async (req) => {
         aspect_ratio: aspect_ratio,
         duration: parseInt(duration),
         status: 'generating',
-        generation_id: taskId,
+        generation_id: videoId,
         is_public: false,
       };
 
@@ -186,7 +140,7 @@ serve(async (req) => {
         return new Response(JSON.stringify({
           success: true,
           video_id: insertedVideo.id,
-          generation_id: taskId,
+          generation_id: videoId,
           status: 'generating',
           message: 'Video generation started. Poll for status updates.',
         }), {
@@ -197,7 +151,7 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true,
-      generation_id: taskId,
+      generation_id: videoId,
       status: 'generating',
       message: 'Video generation started',
     }), {

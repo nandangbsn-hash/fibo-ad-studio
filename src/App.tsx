@@ -14,6 +14,7 @@ import StudioPage from "./pages/StudioPage";
 import CameraDirectorPage from "./pages/CameraDirectorPage";
 import VisualControlsPage from "./pages/VisualControlsPage";
 import VideoStudioPage from "./pages/VideoStudioPage";
+import PostGeneratorPage from "./pages/PostGeneratorPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -67,6 +68,11 @@ const App = () => (
             <Route path="/video-studio/:imageId" element={
               <ProtectedRoute>
                 <VideoStudioPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/post-generator/:imageId" element={
+              <ProtectedRoute>
+                <PostGeneratorPage />
               </ProtectedRoute>
             } />
             <Route path="*" element={<NotFound />} />

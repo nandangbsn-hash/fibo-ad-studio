@@ -2,7 +2,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
-import { ImageIcon, Camera, Palette, Clock, Sparkles, Loader2, Globe, Lock } from "lucide-react";
+import { ImageIcon, Camera, Palette, Clock, Sparkles, Loader2, Globe, Lock, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Header from "@/components/Header";
 import { useFeed } from "@/hooks/useFeed";
@@ -130,23 +130,33 @@ const Feed = () => {
                   </div>
 
                   {/* Hover Actions */}
-                  <div className="absolute inset-0 bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                  <div className="absolute inset-0 bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 p-4">
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => handleOpenCameraDirector(item.id)}
+                        className="bg-accent text-accent-foreground"
+                      >
+                        <Camera className="w-4 h-4 mr-1" />
+                        Camera
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => handleOpenVisualControls(item.id)}
+                        variant="outline"
+                        className="border-border"
+                      >
+                        <Palette className="w-4 h-4 mr-1" />
+                        Visuals
+                      </Button>
+                    </div>
                     <Button
                       size="sm"
-                      onClick={() => handleOpenCameraDirector(item.id)}
-                      className="bg-accent text-accent-foreground"
+                      onClick={() => navigate(`/video-studio/${item.id}`)}
+                      className="bg-primary text-primary-foreground"
                     >
-                      <Camera className="w-4 h-4 mr-2" />
-                      Camera
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => handleOpenVisualControls(item.id)}
-                      variant="outline"
-                      className="border-border"
-                    >
-                      <Palette className="w-4 h-4 mr-2" />
-                      Visuals
+                      <Video className="w-4 h-4 mr-2" />
+                      Convert to Video
                     </Button>
                   </div>
                 </div>

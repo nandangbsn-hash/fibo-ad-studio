@@ -151,12 +151,65 @@ serve(async (req) => {
         console.error('Vertex AI generation failed:', errorMessage);
       } else if (statusData.response) {
         status = 'complete';
-        // Extract video URL from response - Veo returns videos[].gcsUri
+        // Extract video from response - Veo 3 returns videos[].bytesBase64Encoded or gcsUri
         const videos = statusData.response.videos || [];
         if (videos.length > 0) {
-          videoUrl = videos[0].gcsUri || '';
+          const video = videos[0];
+          
+          // Check for GCS URI first
+          if (video.gcsUri) {
+            videoUrl = video.gcsUri;
+            console.log('Video GCS URI:', videoUrl);
+          } 
+          // If base64 encoded, upload to Supabase storage
+          else if (video.bytesBase64Encoded && SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
+            console.log('Video returned as base64, uploading to storage...');
+            
+            try {
+              // Decode base64 to binary
+              const binaryString = atob(video.bytesBase64Encoded);
+              const bytes = new Uint8Array(binaryString.length);
+              for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+              }
+              
+              // Generate unique filename
+              const filename = `${video_id || crypto.randomUUID()}.mp4`;
+              const storagePath = `generated-videos/${filename}`;
+              
+              // Upload to Supabase storage
+              const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+              
+              const { data: uploadData, error: uploadError } = await supabaseAdmin
+                .storage
+                .from('videos')
+                .upload(storagePath, bytes, {
+                  contentType: 'video/mp4',
+                  upsert: true,
+                });
+              
+              if (uploadError) {
+                console.error('Storage upload error:', uploadError);
+                // Still mark as complete but note the storage issue
+                errorMessage = `Video generated but storage upload failed: ${uploadError.message}`;
+              } else {
+                // Get public URL
+                const { data: publicUrlData } = supabaseAdmin
+                  .storage
+                  .from('videos')
+                  .getPublicUrl(storagePath);
+                
+                videoUrl = publicUrlData.publicUrl;
+                console.log('Video uploaded to storage:', videoUrl);
+              }
+            } catch (uploadErr) {
+              console.error('Error processing base64 video:', uploadErr);
+              errorMessage = `Video generated but processing failed: ${uploadErr instanceof Error ? uploadErr.message : 'Unknown error'}`;
+            }
+          } else {
+            console.log('No video data found in response');
+          }
         }
-        console.log('Video URL:', videoUrl);
       }
     }
 

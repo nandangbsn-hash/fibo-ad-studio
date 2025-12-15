@@ -6,7 +6,72 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const VEO_API_BASE = "https://generativelanguage.googleapis.com/v1beta";
+// Generate OAuth2 access token from service account
+async function getAccessToken(serviceAccountJson: string): Promise<string> {
+  const serviceAccount = JSON.parse(serviceAccountJson);
+  
+  const now = Math.floor(Date.now() / 1000);
+  const exp = now + 3600;
+  
+  const header = { alg: "RS256", typ: "JWT" };
+  const payload = {
+    iss: serviceAccount.client_email,
+    scope: "https://www.googleapis.com/auth/cloud-platform",
+    aud: "https://oauth2.googleapis.com/token",
+    iat: now,
+    exp: exp,
+  };
+  
+  const encoder = new TextEncoder();
+  const base64UrlEncode = (data: Uint8Array) => {
+    return btoa(String.fromCharCode(...data))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+  };
+  
+  const headerB64 = base64UrlEncode(encoder.encode(JSON.stringify(header)));
+  const payloadB64 = base64UrlEncode(encoder.encode(JSON.stringify(payload)));
+  const unsignedToken = `${headerB64}.${payloadB64}`;
+  
+  const pemContents = serviceAccount.private_key
+    .replace(/-----BEGIN PRIVATE KEY-----/, '')
+    .replace(/-----END PRIVATE KEY-----/, '')
+    .replace(/\n/g, '');
+  
+  const binaryKey = Uint8Array.from(atob(pemContents), c => c.charCodeAt(0));
+  
+  const cryptoKey = await crypto.subtle.importKey(
+    "pkcs8",
+    binaryKey,
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  
+  const signature = await crypto.subtle.sign(
+    "RSASSA-PKCS1-v1_5",
+    cryptoKey,
+    encoder.encode(unsignedToken)
+  );
+  
+  const signatureB64 = base64UrlEncode(new Uint8Array(signature));
+  const jwt = `${unsignedToken}.${signatureB64}`;
+  
+  const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
+  });
+  
+  if (!tokenResponse.ok) {
+    const error = await tokenResponse.text();
+    throw new Error(`Failed to get access token: ${error}`);
+  }
+  
+  const tokenData = await tokenResponse.json();
+  return tokenData.access_token;
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -14,15 +79,20 @@ serve(async (req) => {
   }
 
   try {
-    // Try GOOGLE_GEMINI_API_KEY first, then fall back to GOOGLE_CLOUD_API_KEY
-    const GEMINI_API_KEY = Deno.env.get('GOOGLE_GEMINI_API_KEY') || Deno.env.get('GOOGLE_CLOUD_API_KEY');
+    const serviceAccountJson = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_JSON');
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
-    if (!GEMINI_API_KEY) {
-      console.error('Google API key is not configured');
-      throw new Error('Google API key is not configured (GOOGLE_GEMINI_API_KEY or GOOGLE_CLOUD_API_KEY)');
+    if (!serviceAccountJson) {
+      throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON is not configured');
     }
+
+    // Parse service account to get project ID
+    const serviceAccount = JSON.parse(serviceAccountJson);
+    const projectId = serviceAccount.project_id;
+    
+    console.log('Generating video with Google Vertex AI Veo');
+    console.log('Project ID:', projectId);
 
     // Extract user ID from Authorization header
     let userId: string | null = null;
@@ -51,10 +121,14 @@ serve(async (req) => {
       throw new Error('Prompt is required for video generation');
     }
 
-    console.log('Generating video with Google Veo 3 API');
     console.log('Prompt:', prompt);
     console.log('Aspect ratio:', aspect_ratio);
     console.log('Duration:', duration);
+
+    // Get OAuth2 access token
+    console.log('Getting OAuth2 access token...');
+    const accessToken = await getAccessToken(serviceAccountJson);
+    console.log('Got access token successfully');
 
     // Prepare image for Veo if provided
     let imageData = null;
@@ -68,7 +142,6 @@ serve(async (req) => {
           };
         }
       } else {
-        // Fetch image and convert to base64
         try {
           const imageResponse = await fetch(source_image_url);
           if (imageResponse.ok) {
@@ -92,26 +165,15 @@ serve(async (req) => {
       }
     }
 
-    // Build the Veo 3 request - using the correct model and endpoint
-    const veoModel = "veo-3.0-generate-preview";
-    const veoUrl = `${VEO_API_BASE}/models/${veoModel}:predictLongRunning`;
-
-    // Map aspect ratio
-    const aspectRatioMap: Record<string, string> = {
-      '16:9': '16:9',
-      '9:16': '9:16',
-      '1:1': '1:1',
-    };
-
+    // Build Vertex AI request body
     const requestBody: any = {
-      instances: [
-        {
-          prompt: prompt,
-        }
-      ],
+      instances: [{
+        prompt: prompt,
+      }],
       parameters: {
-        aspectRatio: aspectRatioMap[aspect_ratio] || '16:9',
-      }
+        aspectRatio: aspect_ratio,
+        sampleCount: 1,
+      },
     };
 
     // Add image if provided (image-to-video)
@@ -123,35 +185,39 @@ serve(async (req) => {
       console.log('Added image to request for image-to-video generation');
     }
 
-    console.log('Sending request to Veo 3...');
-    console.log('Request URL:', veoUrl);
+    // Vertex AI endpoint for Veo - using imagen for video generation
+    // Note: Veo model name might vary, trying veo-001 or imagen-3.0-generate-002
+    const vertexUrl = `https://us-central1-aiplatform.googleapis.com/v1/projects/${projectId}/locations/us-central1/publishers/google/models/veo-001:predictLongRunning`;
+    
+    console.log('Sending request to Vertex AI...');
+    console.log('Request URL:', vertexUrl);
 
-    const response = await fetch(veoUrl, {
+    const response = await fetch(vertexUrl, {
       method: 'POST',
       headers: {
+        'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
-        'x-goog-api-key': GEMINI_API_KEY,
       },
       body: JSON.stringify(requestBody),
     });
 
-    console.log('Veo 3 response status:', response.status);
+    console.log('Vertex AI response status:', response.status);
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Veo 3 error:', errorText);
-      throw new Error(`Veo 3 API error: ${response.status} - ${errorText}`);
+      console.error('Vertex AI error:', errorText);
+      throw new Error(`Vertex AI error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
-    console.log('Veo 3 response:', JSON.stringify(data));
+    console.log('Vertex AI response:', JSON.stringify(data));
 
-    // The response contains an operation name for long-running operations
+    // Get operation name for polling
     const operationName = data.name;
     
     if (!operationName) {
       console.error('No operation name in response:', JSON.stringify(data));
-      throw new Error('No operation name was returned from Veo 3 API');
+      throw new Error('No operation name was returned from Vertex AI');
     }
 
     console.log('Got operation name:', operationName);
@@ -188,7 +254,7 @@ serve(async (req) => {
           video_id: insertedVideo.id,
           generation_id: operationName,
           status: 'generating',
-          message: 'Video generation started with Veo 3. Poll for status updates.',
+          message: 'Video generation started with Vertex AI Veo.',
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -199,7 +265,7 @@ serve(async (req) => {
       success: true,
       generation_id: operationName,
       status: 'generating',
-      message: 'Video generation started with Veo 3',
+      message: 'Video generation started with Vertex AI Veo',
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

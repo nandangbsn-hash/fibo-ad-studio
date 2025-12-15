@@ -2,7 +2,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
-import { ImageIcon, Camera, Palette, Clock, Sparkles, Loader2, Globe, Lock, Video } from "lucide-react";
+import { ImageIcon, Camera, Palette, Clock, Sparkles, Loader2, Globe, Lock, Video, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Header from "@/components/Header";
 import { useFeed } from "@/hooks/useFeed";
@@ -150,14 +150,24 @@ const Feed = () => {
                         Visuals
                       </Button>
                     </div>
-                    <Button
-                      size="sm"
-                      onClick={() => navigate(`/video-studio/${item.id}`)}
-                      className="bg-primary text-primary-foreground"
-                    >
-                      <Video className="w-4 h-4 mr-2" />
-                      Convert to Video
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => navigate(`/video-studio/${item.id}`)}
+                        className="bg-primary text-primary-foreground"
+                      >
+                        <Video className="w-4 h-4 mr-1" />
+                        Video
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => navigate(`/post-generator/${item.id}`)}
+                        variant="secondary"
+                      >
+                        <MessageSquare className="w-4 h-4 mr-1" />
+                        Post
+                      </Button>
+                    </div>
                   </div>
                 </div>
 

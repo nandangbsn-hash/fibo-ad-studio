@@ -188,6 +188,65 @@ export type Database = {
           },
         ]
       }
+      generated_videos: {
+        Row: {
+          aspect_ratio: string | null
+          created_at: string | null
+          duration: number | null
+          generation_id: string | null
+          id: string
+          is_public: boolean | null
+          resolution: string | null
+          source_image_id: string | null
+          status: string | null
+          structured_prompt: Json | null
+          updated_at: string | null
+          user_id: string | null
+          video_prompt: string | null
+          video_url: string | null
+        }
+        Insert: {
+          aspect_ratio?: string | null
+          created_at?: string | null
+          duration?: number | null
+          generation_id?: string | null
+          id?: string
+          is_public?: boolean | null
+          resolution?: string | null
+          source_image_id?: string | null
+          status?: string | null
+          structured_prompt?: Json | null
+          updated_at?: string | null
+          user_id?: string | null
+          video_prompt?: string | null
+          video_url?: string | null
+        }
+        Update: {
+          aspect_ratio?: string | null
+          created_at?: string | null
+          duration?: number | null
+          generation_id?: string | null
+          id?: string
+          is_public?: boolean | null
+          resolution?: string | null
+          source_image_id?: string | null
+          status?: string | null
+          structured_prompt?: Json | null
+          updated_at?: string | null
+          user_id?: string | null
+          video_prompt?: string | null
+          video_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generated_videos_source_image_id_fkey"
+            columns: ["source_image_id"]
+            isOneToOne: false
+            referencedRelation: "generated_images"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

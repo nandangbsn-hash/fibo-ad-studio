@@ -87,6 +87,10 @@ serve(async (req) => {
       throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON is not configured');
     }
 
+    // Parse service account to get project ID
+    const serviceAccount = JSON.parse(serviceAccountJson);
+    const projectId = serviceAccount.project_id;
+
     const body = await req.json();
     const { generation_id, video_id } = body;
 
@@ -95,21 +99,32 @@ serve(async (req) => {
     }
 
     console.log('Checking Vertex AI operation status:', generation_id);
+    console.log('Project ID:', projectId);
 
     // Get OAuth2 access token
     const accessToken = await getAccessToken(serviceAccountJson);
 
-    // Poll operation status - the generation_id is the full operation path
-    const statusUrl = `https://us-central1-aiplatform.googleapis.com/v1/${generation_id}`;
+    // Extract model ID from the generation_id (full operation path)
+    // Format: projects/PROJECT_ID/locations/us-central1/publishers/google/models/MODEL_ID/operations/OPERATION_ID
+    const modelIdMatch = generation_id.match(/models\/([^\/]+)\/operations/);
+    const modelId = modelIdMatch ? modelIdMatch[1] : 'veo-3.0-generate-001';
+    
+    console.log('Extracted model ID:', modelId);
+
+    // Use fetchPredictOperation endpoint (POST request with operationName in body)
+    const statusUrl = `https://us-central1-aiplatform.googleapis.com/v1/projects/${projectId}/locations/us-central1/publishers/google/models/${modelId}:fetchPredictOperation`;
     
     console.log('Status URL:', statusUrl);
 
     const statusResponse = await fetch(statusUrl, {
-      method: 'GET',
+      method: 'POST',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
+      body: JSON.stringify({
+        operationName: generation_id,
+      }),
     });
 
     console.log('Vertex AI status response:', statusResponse.status);
@@ -136,10 +151,10 @@ serve(async (req) => {
         console.error('Vertex AI generation failed:', errorMessage);
       } else if (statusData.response) {
         status = 'complete';
-        // Extract video URL from response - structure may vary
-        const predictions = statusData.response.predictions || [];
-        if (predictions.length > 0) {
-          videoUrl = predictions[0].videoUri || predictions[0].video?.uri || '';
+        // Extract video URL from response - Veo returns videos[].gcsUri
+        const videos = statusData.response.videos || [];
+        if (videos.length > 0) {
+          videoUrl = videos[0].gcsUri || '';
         }
         console.log('Video URL:', videoUrl);
       }

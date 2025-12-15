@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const VEO_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
+const VEO_API_BASE = "https://generativelanguage.googleapis.com/v1beta";
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -14,13 +14,14 @@ serve(async (req) => {
   }
 
   try {
-    const GOOGLE_CLOUD_API_KEY = Deno.env.get('GOOGLE_CLOUD_API_KEY');
+    // Try GOOGLE_GEMINI_API_KEY first, then fall back to GOOGLE_CLOUD_API_KEY
+    const GEMINI_API_KEY = Deno.env.get('GOOGLE_GEMINI_API_KEY') || Deno.env.get('GOOGLE_CLOUD_API_KEY');
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
-    if (!GOOGLE_CLOUD_API_KEY) {
-      console.error('Google Cloud API key is not configured');
-      throw new Error('Google Cloud API key is not configured');
+    if (!GEMINI_API_KEY) {
+      console.error('Google API key is not configured');
+      throw new Error('Google API key is not configured (GOOGLE_GEMINI_API_KEY or GOOGLE_CLOUD_API_KEY)');
     }
 
     // Extract user ID from Authorization header
@@ -68,23 +69,32 @@ serve(async (req) => {
         }
       } else {
         // Fetch image and convert to base64
-        const imageResponse = await fetch(source_image_url);
-        if (imageResponse.ok) {
-          const arrayBuffer = await imageResponse.arrayBuffer();
-          const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-          const contentType = imageResponse.headers.get('content-type') || 'image/png';
-          imageData = {
-            mimeType: contentType,
-            data: base64,
-          };
+        try {
+          const imageResponse = await fetch(source_image_url);
+          if (imageResponse.ok) {
+            const arrayBuffer = await imageResponse.arrayBuffer();
+            const bytes = new Uint8Array(arrayBuffer);
+            let binary = '';
+            for (let i = 0; i < bytes.byteLength; i++) {
+              binary += String.fromCharCode(bytes[i]);
+            }
+            const base64 = btoa(binary);
+            const contentType = imageResponse.headers.get('content-type') || 'image/png';
+            imageData = {
+              mimeType: contentType,
+              data: base64,
+            };
+            console.log('Image converted to base64, size:', base64.length);
+          }
+        } catch (e) {
+          console.log('Could not fetch image:', e);
         }
       }
-      console.log('Image data prepared for Veo');
     }
 
-    // Build the Veo 3 request
+    // Build the Veo 3 request - using the correct model and endpoint
     const veoModel = "veo-3.0-generate-preview";
-    const veoUrl = `${VEO_API_BASE}/${veoModel}:predictLongRunning?key=${GOOGLE_CLOUD_API_KEY}`;
+    const veoUrl = `${VEO_API_BASE}/models/${veoModel}:predictLongRunning`;
 
     // Map aspect ratio
     const aspectRatioMap: Record<string, string> = {
@@ -101,17 +111,16 @@ serve(async (req) => {
       ],
       parameters: {
         aspectRatio: aspectRatioMap[aspect_ratio] || '16:9',
-        durationSeconds: parseInt(duration) || 5,
-        numberOfVideos: 1,
       }
     };
 
-    // Add image if provided
+    // Add image if provided (image-to-video)
     if (imageData) {
       requestBody.instances[0].image = {
         bytesBase64Encoded: imageData.data,
         mimeType: imageData.mimeType,
       };
+      console.log('Added image to request for image-to-video generation');
     }
 
     console.log('Sending request to Veo 3...');
@@ -121,6 +130,7 @@ serve(async (req) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'x-goog-api-key': GEMINI_API_KEY,
       },
       body: JSON.stringify(requestBody),
     });

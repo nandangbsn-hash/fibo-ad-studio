@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { FiboStructuredPrompt, GeneratedImage } from "@/types/fibo";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
 
 interface PreviewPaneProps {
   structuredPrompt: FiboStructuredPrompt | null;
@@ -41,37 +42,33 @@ const PreviewPane = ({ structuredPrompt, aspectRatio, generatedImages, setGenera
         const sceneDescription = structuredPrompt.short_description || 
           `${structuredPrompt.background_setting}, ${structuredPrompt.lighting?.conditions || 'studio lighting'}`;
         
-        response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-product-shot`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
-          body: JSON.stringify({ 
+        const { data, error } = await supabase.functions.invoke('generate-product-shot', {
+          body: {
             productImageUrl: productImageUrl,
             sceneDescription: sceneDescription,
             aspectRatio: aspectRatio,
             placementType: 'automatic',
-            optimizeDescription: true
-          }),
+            optimizeDescription: true,
+          },
         });
+
+        if (error) throw error;
+        response = data;
       } else {
         // Use standard FIBO generation
-        response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-fibo`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
-          body: JSON.stringify({ 
+        const { data, error } = await supabase.functions.invoke('generate-fibo', {
+          body: {
             structured_prompt: structuredPrompt,
             aspect_ratio: aspectRatio,
-            sync: true
-          }),
+            sync: true,
+          },
         });
+
+        if (error) throw error;
+        response = data;
       }
 
-      const data = await response.json();
+      const data = response;
       
       // Handle both response formats
       const imageUrl = data.image_url || data.images?.[0]?.url;

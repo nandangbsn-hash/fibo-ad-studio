@@ -13,6 +13,7 @@ import JsonPanel from "@/components/JsonPanel";
 import ColorWheel, { ColorPoint } from "@/components/ColorWheel";
 import { useImageStore } from "@/hooks/useImageStore";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import { 
   CameraSettings, 
   VisualSettings,
@@ -375,29 +376,25 @@ const StudioPage = () => {
     setIsGenerating(true);
     
     try {
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-fibo`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: JSON.stringify({ 
+      const { data, error } = await supabase.functions.invoke('generate-fibo', {
+        body: {
           structured_prompt: structuredPrompt,
           aspect_ratio: aspectRatio,
-          sync: true
-        }),
+          sync: true,
+        },
       });
 
-      const data = await response.json();
+      if (error) throw error;
+      const dataObj = data;
       
-      if (data.success && data.image_url) {
-        setGeneratedImage(data.image_url);
+      if (dataObj.success && dataObj.image_url) {
+        setGeneratedImage(dataObj.image_url);
         
         await saveGeneratedImage(
-          data.image_url,
+          dataObj.image_url,
           structuredPrompt,
           aspectRatio,
-          data.seed,
+          dataObj.seed,
           undefined,
           undefined,
           cameraSettings,
@@ -408,7 +405,7 @@ const StudioPage = () => {
 
         toast({ title: "Image generated!", description: "Saved to your gallery" });
       } else {
-        throw new Error(data.error || 'Generation failed');
+        throw new Error(dataObj.error || 'Generation failed');
       }
     } catch (error) {
       console.error('Error generating:', error);

@@ -11,3 +11,9 @@ verify_jwt = false
 
 [functions.generate-product-shot]
 verify_jwt = false
+
+[functions.generate-video]
+verify_jwt = false
+
+[functions.check-video-status]
+verify_jwt = false

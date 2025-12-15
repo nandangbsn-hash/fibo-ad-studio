@@ -1,6 +1,7 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ImageIcon, Sparkles, Loader2, Download, ExternalLink, Zap, Package } from "lucide-react";
+import { ImageIcon, Sparkles, Loader2, Download, ExternalLink, Zap, Package, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FiboStructuredPrompt, GeneratedImage } from "@/types/fibo";
 import { useToast } from "@/hooks/use-toast";
@@ -19,8 +20,12 @@ const PreviewPane = ({ structuredPrompt, aspectRatio, generatedImages, setGenera
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const hasProductImage = !!productImageUrl;
+
+  // Find the selected image object to get its ID
+  const selectedImageObj = generatedImages.find(img => img.url === selectedImage);
 
   const handleGenerate = async () => {
     if (!structuredPrompt) {
@@ -227,27 +232,40 @@ const PreviewPane = ({ structuredPrompt, aspectRatio, generatedImages, setGenera
 
       {/* Actions */}
       {selectedImage && (
-        <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="flex-1 border-border/50"
-            onClick={() => window.open(selectedImage, '_blank')}
-          >
-            <ExternalLink className="w-4 h-4 mr-2" />
-            Open Full Size
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="flex-1 border-border/50"
-            asChild
-          >
-            <a href={selectedImage} download>
-              <Download className="w-4 h-4 mr-2" />
-              Download
-            </a>
-          </Button>
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="flex-1 border-border/50"
+              onClick={() => window.open(selectedImage, '_blank')}
+            >
+              <ExternalLink className="w-4 h-4 mr-2" />
+              Open Full Size
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="flex-1 border-border/50"
+              asChild
+            >
+              <a href={selectedImage} download>
+                <Download className="w-4 h-4 mr-2" />
+                Download
+              </a>
+            </Button>
+          </div>
+          
+          {/* Convert to Video Button */}
+          {selectedImageObj?.id && (
+            <Button
+              onClick={() => navigate(`/video-studio/${selectedImageObj.id}`)}
+              className="w-full bg-accent text-accent-foreground font-semibold"
+            >
+              <Video className="w-4 h-4 mr-2" />
+              Convert to Video Ad
+            </Button>
+          )}
         </div>
       )}
     </motion.section>

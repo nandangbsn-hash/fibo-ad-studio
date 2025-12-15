@@ -13,6 +13,7 @@ import Feed from "./pages/Feed";
 import StudioPage from "./pages/StudioPage";
 import CameraDirectorPage from "./pages/CameraDirectorPage";
 import VisualControlsPage from "./pages/VisualControlsPage";
+import VideoStudioPage from "./pages/VideoStudioPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -61,6 +62,11 @@ const App = () => (
             <Route path="/visual-controls/:imageId" element={
               <ProtectedRoute>
                 <VisualControlsPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/video-studio/:imageId" element={
+              <ProtectedRoute>
+                <VideoStudioPage />
               </ProtectedRoute>
             } />
             <Route path="*" element={<NotFound />} />

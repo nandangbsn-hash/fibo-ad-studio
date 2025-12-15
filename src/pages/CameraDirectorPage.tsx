@@ -212,27 +212,23 @@ const CameraDirectorPage = () => {
     setIsGenerating(true);
     
     try {
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-fibo`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: JSON.stringify({ 
+      const { data, error } = await supabase.functions.invoke('generate-fibo', {
+        body: {
           structured_prompt: structuredPrompt,
           aspect_ratio: image.aspect_ratio,
-          sync: true
-        }),
+          sync: true,
+        },
       });
 
-      const data = await response.json();
+      if (error) throw error;
+      const dataObj = data;
       
-      if (data.success && data.image_url) {
+      if (dataObj.success && dataObj.image_url) {
         const savedImage = await saveGeneratedImage(
-          data.image_url,
+          dataObj.image_url,
           structuredPrompt,
           image.aspect_ratio,
-          data.seed,
+          dataObj.seed,
           image.campaign_id || undefined,
           image.concept_id || undefined,
           cameraSettings,
@@ -246,7 +242,7 @@ const CameraDirectorPage = () => {
           navigate(`/camera-director/${savedImage.id}`);
         }
       } else {
-        throw new Error(data.error || 'Generation failed');
+        throw new Error(dataObj.error || 'Generation failed');
       }
     } catch (error) {
       console.error('Error generating:', error);

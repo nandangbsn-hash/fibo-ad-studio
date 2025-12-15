@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const AIML_API_URL = "https://api.aimlapi.com/v2/generate/video";
+const AIML_API_URL = "https://api.aimlapi.com/v2/video/generations";
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {

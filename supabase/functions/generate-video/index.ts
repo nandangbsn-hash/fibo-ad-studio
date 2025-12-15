@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const AIML_API_URL = "https://api.aimlapi.com/v2/generate/video";
+const AIML_API_URL = "https://api.aimlapi.com/v2/video/generations";
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -63,11 +63,12 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'veo-3.1',
+        model: 'google/veo-3.1-i2v',
         image_url: source_image_url,
         prompt: prompt || 'Subtle camera movement, cinematic product reveal',
         aspect_ratio: aspect_ratio,
         resolution: resolution,
+        generate_audio: false,
       }),
     });
 

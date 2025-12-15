@@ -99,7 +99,18 @@ serve(async (req) => {
       throw new Error('Source image URL is required');
     }
 
-    console.log('Generating video with Kling API for:', source_image_url);
+    // Extract base64 data from data URL if present
+    let imageData = source_image_url;
+    if (source_image_url.startsWith('data:')) {
+      // Strip the data URL prefix (e.g., "data:image/png;base64,")
+      const base64Match = source_image_url.match(/^data:image\/[a-zA-Z]+;base64,(.+)$/);
+      if (base64Match) {
+        imageData = base64Match[1];
+        console.log('Extracted base64 data from data URL, length:', imageData.length);
+      }
+    }
+
+    console.log('Generating video with Kling API');
     console.log('Prompt:', prompt);
     console.log('Aspect ratio:', aspect_ratio);
     console.log('Duration:', duration);
@@ -117,7 +128,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model_name: 'kling-v1',
-        image: source_image_url,
+        image: imageData,
         prompt: prompt || 'Subtle camera movement, cinematic product reveal',
         negative_prompt: '',
         cfg_scale: 0.5,

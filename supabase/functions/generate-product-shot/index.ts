@@ -14,25 +14,45 @@ serve(async (req) => {
   }
 
   try {
-    const BRIA_API_KEY = Deno.env.get('BRIA_API_KEY');
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
-    if (!BRIA_API_KEY) {
-      console.error('BRIA_API_KEY is not configured');
-      throw new Error('BRIA_API_KEY is not configured');
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      throw new Error('Supabase configuration missing');
     }
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // Extract user ID from Authorization header
     let userId: string | null = null;
     const authHeader = req.headers.get('authorization');
-    if (authHeader && SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
-      const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-      const token = authHeader.replace('Bearer ', '');
-      const { data: { user } } = await supabase.auth.getUser(token);
-      userId = user?.id || null;
-      console.log('User ID from token:', userId);
+    if (!authHeader) {
+      throw new Error('Authorization required');
     }
+    
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user } } = await supabase.auth.getUser(token);
+    userId = user?.id || null;
+    console.log('User ID from token:', userId);
+
+    if (!userId) {
+      throw new Error('User not authenticated');
+    }
+
+    // Fetch user's BRIA API key from user_settings
+    const { data: userSettings, error: settingsError } = await supabase
+      .from('user_settings')
+      .select('bria_api_key')
+      .eq('user_id', userId)
+      .single();
+
+    if (settingsError || !userSettings?.bria_api_key) {
+      console.error('Failed to fetch user BRIA API key:', settingsError);
+      throw new Error('BRIA API key not configured. Please add your API key in settings.');
+    }
+
+    const BRIA_API_KEY = userSettings.bria_api_key;
+    console.log('Using user-specific BRIA API key');
 
     const { 
       productImageUrl, 

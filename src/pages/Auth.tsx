@@ -1,25 +1,28 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Camera, Mail, Lock, User, ArrowRight, Loader2 } from "lucide-react";
+import { Camera, Mail, Lock, User, ArrowRight, Loader2, Key } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { z } from "zod";
+import { supabase } from "@/integrations/supabase/client";
 
 const emailSchema = z.string().email("Please enter a valid email address");
 const passwordSchema = z.string().min(6, "Password must be at least 6 characters");
 const nameSchema = z.string().min(2, "Name must be at least 2 characters");
+const briaKeySchema = z.string().min(10, "Please enter a valid BRIA API key");
 
 const Auth = () => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [briaApiKey, setBriaApiKey] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string; name?: string }>({});
+  const [errors, setErrors] = useState<{ email?: string; password?: string; name?: string; briaKey?: string }>({});
   
   const { signIn, signUp, user, isLoading } = useAuth();
   const navigate = useNavigate();
@@ -31,7 +34,7 @@ const Auth = () => {
   }, [user, isLoading, navigate]);
 
   const validateForm = () => {
-    const newErrors: { email?: string; password?: string; name?: string } = {};
+    const newErrors: { email?: string; password?: string; name?: string; briaKey?: string } = {};
     
     const emailResult = emailSchema.safeParse(email);
     if (!emailResult.success) {
@@ -48,6 +51,11 @@ const Auth = () => {
       if (!nameResult.success) {
         newErrors.name = nameResult.error.errors[0].message;
       }
+      
+      const briaResult = briaKeySchema.safeParse(briaApiKey);
+      if (!briaResult.success) {
+        newErrors.briaKey = briaResult.error.errors[0].message;
+      }
     }
     
     setErrors(newErrors);
@@ -63,16 +71,28 @@ const Auth = () => {
     
     try {
       if (isSignUp) {
-        const { error } = await signUp(email, password, fullName);
+        const { error, user: newUser } = await signUp(email, password, fullName);
         if (error) {
           if (error.message.includes("already registered")) {
             toast.error("This email is already registered. Please sign in instead.");
           } else {
             toast.error(error.message);
           }
-        } else {
-          toast.success("Account created successfully! You can now sign in.");
-          setIsSignUp(false);
+        } else if (newUser) {
+          // Save BRIA API key to user_settings
+          const { error: settingsError } = await supabase
+            .from('user_settings')
+            .insert({
+              user_id: newUser.id,
+              bria_api_key: briaApiKey
+            });
+          
+          if (settingsError) {
+            console.error('Failed to save BRIA API key:', settingsError);
+            toast.error("Account created but failed to save API key. Please update in settings.");
+          } else {
+            toast.success("Account created successfully!");
+          }
         }
       } else {
         const { error } = await signIn(email, password);
@@ -158,6 +178,34 @@ const Auth = () => {
                   </div>
                   {errors.name && (
                     <p className="text-xs text-destructive">{errors.name}</p>
+                  )}
+                </div>
+              )}
+              
+              {isSignUp && (
+                <div className="space-y-2">
+                  <Label htmlFor="briaApiKey">BRIA API Key</Label>
+                  <div className="relative">
+                    <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      id="briaApiKey"
+                      type="password"
+                      placeholder="Enter your BRIA API key"
+                      value={briaApiKey}
+                      onChange={(e) => setBriaApiKey(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                  <a 
+                    href="https://bria.ai/api" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-xs text-primary hover:underline"
+                  >
+                    Get your BRIA API key →
+                  </a>
+                  {errors.briaKey && (
+                    <p className="text-xs text-destructive">{errors.briaKey}</p>
                   )}
                 </div>
               )}
